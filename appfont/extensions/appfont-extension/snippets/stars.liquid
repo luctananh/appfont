@@ -1,0 +1,106 @@
+{% assign design_settings = shop.metafields.setting.style %}
+{% if design_settings %}
+  {% assign font_settings = design_settings | parse_json %}
+  {% assign font_value = font_settings.value %}
+
+  <script>
+    window.fontSettings = {{ font_value | json }};
+    console.log("Font settings from liquid:", window.fontSettings);
+  </script>
+{% else %}
+  <p>No font settings found.</p>
+{% endif %}
+
+<script src="https://appfont--development.gadget.app/api/client/web.min.js" defer="defer"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+  
+        // Hàm chèn CSS cho font từ URL blob
+        function injectFontCSSFromBlob(blobURL, fontName, selectors) {
+            const styleElement = document.createElement("style");
+            styleElement.type = "text/css";
+  
+            let cssContent = `
+                @font-face {
+                    font-family: "${fontName}";
+                    src: url('${blobURL}') format('woff');
+                }
+            `;
+             if(selectors){
+                   styleElement.appendChild(document.createTextNode(cssContent + `
+                           ${selectors} {
+                                font-family: "${fontName}" !important;
+                             }
+                    `));
+               }else {
+                     console.warn("No elements selected. Font will not be applied.")
+                }
+  
+            document.head.appendChild(styleElement);
+        }
+        // Hàm chèn CSS cho font từ đường dẫn URL thông thường
+        function injectFontCSS(fontName, fontLink, selectors) {
+            const styleElement = document.createElement("style");
+            styleElement.type = "text/css";
+  
+            let cssContent = `
+                @import url("${fontLink}");
+                `;
+            if(selectors){
+                  styleElement.appendChild(document.createTextNode(cssContent + `
+                            ${selectors} {
+                                 font-family: "${fontName}" !important;
+                             }
+                    `));
+            }else {
+                  console.warn("No elements selected. Font will not be applied.")
+            }
+            document.head.appendChild(styleElement);
+        }
+  
+        // Hàm chuyển đổi base64 thành blob
+        function base64toBlob(base64, type) {
+            const bytes = atob(base64);
+            const byteNumbers = new Array(bytes.length);
+            for (let i = 0; i < bytes.length; i++) {
+                byteNumbers[i] = bytes.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: type });
+        }
+  
+        // Kiểm tra nếu `fontSettings` tồn tại và có link
+        if (window.fontSettings && window.fontSettings.link) {
+             const fontName = window.fontSettings.name || 'CustomFont';
+             const fontLink = window.fontSettings.link;
+              const selectedElements =  window.fontSettings.selectedElements;
+           let selectors;
+            if(selectedElements) {
+              selectors =  selectedElements.split(',').join(', ');
+            }
+  
+  
+            // Kiểm tra nếu link có dạng base64
+            if (fontLink.startsWith("d09GR")) {
+                 try{
+                     const blob = base64toBlob(fontLink, "font/woff");
+                     const blobURL = URL.createObjectURL(blob);
+                     injectFontCSSFromBlob(blobURL, fontName,selectors);
+                 } catch (error) {
+                   console.error("Error converting base64 to blob:", error);
+                 }
+            }
+            else if (fontLink && fontLink.startsWith('blob:')) {
+                  injectFontCSSFromBlob(fontLink, fontName,selectors);
+           }
+             else if (fontLink) {
+               injectFontCSS(fontName, fontLink, selectors);
+             } else {
+                console.error("Font link is missing or invalid.");
+             }
+           }else {
+              console.error("Font settings not found or invalid.");
+         }
+    });
+</script>

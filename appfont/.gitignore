@@ -1,0 +1,5 @@
+.gadget/
+node_modules/
+**/.DS_Store
+extensions/*/dist
+extensions/*/node_modules

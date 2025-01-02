@@ -1,0 +1,18 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "37fc1b80f7b202ca12cad41ff2260549"
+name = "appfont"
+application_url = "https://appfont--development.gadget.app/api/shopify/install-or-render"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+dev_store_url = "storelta.myshopify.com"
+
+[auth]
+redirect_urls = [
+  "https://appfont--development.gadget.app/api/connections/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2024-10"
