@@ -123,14 +123,16 @@ export default function FontManager() {
                 // Event khi file đã đọc xong
                 const base64Data = reader.result.split(',')[1]; // Lấy data base64
                 try {
-                    await api.datafontgg.create({
-                            // Tạo font mới
-                            name: fileName,
-                            link: base64Data,
-                        keyfont: keyfont,
-                        });
+                     const response = await api.datafontgg.create({
+                        // Tạo font mới
+                        name: fileName,
+                        link: base64Data,
+                         keyfont: keyfont,
+                    });
+                    
                     fetchFonts(); // Tải lại danh sách font
-                    await handleCreateUpdateSelectfont(keyfont); // Cập nhật cài đặt font đã chọn sau khi upload
+                    await handleCreateUpdateSelectfont(keyfont, null, response); // Cập nhật cài đặt font đã chọn sau khi upload, and pass the new created font data
+                   
                 } catch (error) {
                     console.error('Error uploading/updating file to Gadget:', error);
                     setToastContent('Upload failed. Please try again: ' + error.message);
@@ -154,8 +156,8 @@ export default function FontManager() {
             setLoading(false);
         }
     };
-    // Hàm xử lý khi file được thả vào DropZone
-        const validImageTypes = ['image/gif', 'image/jpeg', 'image/png'];
+     // Hàm xử lý khi file được thả vào DropZone
+    const validImageTypes = ['image/gif', 'image/jpeg', 'image/png'];
     const handleDropZoneDrop = useCallback((_dropFiles, acceptedFiles) => {
         setFile(acceptedFiles[0]); // Chỉ lấy file đầu tiên
     }, []);
@@ -194,7 +196,7 @@ export default function FontManager() {
     }, []);
 
     // Hàm lưu font sau khi upload
-     const handleSave = async () => {
+    const handleSave = async () => {
         if (!file || !fileName) {
             // Validation: Check file và tên
             setBannerContent('Please add file and enter the name!');
@@ -207,128 +209,23 @@ export default function FontManager() {
         if (!selectedTags) {
             setBannerContent('Please select the elements to apply the font!');
             setBannerActive(true);
-            return;
-        }
+             return;
+         }
         try {
-             setLoading(true);
-              const reader = new FileReader(); // FileReader để xử lý nội dung file
-            reader.readAsDataURL(file); // Đọc file dưới dạng base64
-            reader.onloadend = async () => {
-                  const base64Data = reader.result.split(',')[1]; // Lấy data base64
-             
-                      await api.datafontgg.create({
-                            // Tạo font mới
-                            name: fileName,
-                            link: base64Data,
-                            keyfont: "upload",
-                         });
-                     fetchFonts(); // Tải lại danh sách font
-                     const latestFont = await api.datafontgg.findMany({
-                         orderBy: {
-                             createdAt: 'desc',
-                         },
-                        take: 1,
-                         filter: {
-                            keyfont: { equals: "upload" },
-                         },
-                    });
-                    if (latestFont.length === 0) {
-                      setToastContent('No fonts uploaded yet.');
-                      setToastActive(true);
-                        return;
-                    }
+             await uploadFileToGadget(file,"upload"); // Upload file lên Gadget API
 
-                   const selectedFontDetail = latestFont[0]
-                    const selectfontRecords = await api.selectfont.findMany({
-                        filter: {
-                             shopid: { equals: String(await api.shopifyShop.findFirst({ select: { id: true } }).id) },
-                             namespace: { equals: 'setting' },
-                             key: { equals: 'style' },
-                        },
-                    });
-
-                     let data;
-                     const value = {
-                         id: selectedFontDetail.id,
-                         name: selectedFontDetail.name,
-                         link: selectedFontDetail.link,
-                         selectedElements: selectedTags,
-                    };
-                    if (selectfontRecords.length === 0) {
-                      data = await api.selectfont.create({
-                           selectfont: {
-                            shopid: String(await api.shopifyShop.findFirst({ select: { id: true } }).id),
-                             namespace: 'setting',
-                              key: 'style',
-                             value: value,
-                          },
-                        });
-                     } else {
-                       data = await api.selectfont.update(selectfontRecords[0].id, {
-                         selectfont: {
-                            value: value,
-                            },
-                         });
-                     }
-                    if (value && value.selectedElements) {
-                       const selectedTags = value.selectedElements.split(',');
-                       const initialSelectedElements = {
-                           h1: false,
-                           h2: false,
-                           h3: false,
-                           h4: false,
-                           h5: false,
-                           h6: false,
-                           body: false,
-                           p: false,
-                           a: false,
-                           li: false,
-                        };
-                         selectedTags.forEach((tag) => {
-                           if (initialSelectedElements.hasOwnProperty(tag)) {
-                               initialSelectedElements[tag] = true;
-                            }
-                         });
-                         setSelectedElements(initialSelectedElements);
-                     } else {
-                        setSelectedElements({
-                            h1: false,
-                            h2: false,
-                           h3: false,
-                            h4: false,
-                            h5: false,
-                           h6: false,
-                           body: false,
-                           p: false,
-                            a: false,
-                            li: false,
-                        });
-                    }
-                 
-                    setToastContent('Font applied successfully!');
-                    setToastActive(true);
-            }
-              reader.onerror = (error) => {
-                // Event khi đọc file bị lỗi
-                console.error('Error reading file:', error);
-                setToastContent('Error reading file. Please try again.');
-                setToastActive(true);
-                setLoading(false);
-            };
-            // Reset file và tên sau khi lưu thành công
-             setFile(null) // Reset state file
+             // Reset file và tên sau khi lưu thành công
+              setFile(null) // Reset state file
             setFileName(''); // Reset state tên file
         } catch (error) {
-            console.error('Error saving font:', error);
+             console.error('Error saving font:', error);
             setToastContent('Failed to save font: ' + error);
-            setToastActive(true);
-        }finally{
-             setLoading(false);
+             setToastActive(true);
         }
     };
 
     // Hàm tạo/cập nhật cài đặt font đã chọn và lưu vào Gadget API
-    const handleCreateUpdateSelectfont = async (keyfont, selectedFonts) => {
+     const handleCreateUpdateSelectfont = async (keyfont, selectedFonts, createdFontData = null) => {
         try {
             setLoading(true);
             const shop = await api.shopifyShop.findFirst({ select: { id: true } });
@@ -340,7 +237,7 @@ export default function FontManager() {
              if (keyfont === 'google') {
                 if (!selectedFonts) {
                     setBannerContent('Please select a font first.');
-                    setBannerActive(true);
+                   setBannerActive(true);
                     setLoading(false);
                     return;
                 }
@@ -354,43 +251,47 @@ export default function FontManager() {
                 }
                 selectedFontDetail = {
                     id: fontDetails[0].value,
-                    name: fontDetails[0].label,
-                    link: `https://fonts.googleapis.com/css2?family=${fontDetails[0].label.replace(/ /g, '+')}&display=swap`,
+                   name: fontDetails[0].label,
+                   link: `https://fonts.googleapis.com/css2?family=${fontDetails[0].label.replace(/ /g, '+')}&display=swap`,
                     keyfont: keyfont,
                 };
-                 await api.datafontgg.create({
-                     name: selectedFontDetail.name,
-                     link: selectedFontDetail.link,
-                     keyfont: 'google',
-                 });
-                  fetchFonts() // Tải lại danh sách font
-            } else {
-                 const latestFont = await api.datafontgg.findMany({
-                     orderBy: {
-                        createdAt: 'desc',
-                    },
-                     take: 1,
-                     filter: {
-                         keyfont: { equals: "upload" },
-                     },
+                await api.datafontgg.create({
+                    name: selectedFontDetail.name,
+                    link: selectedFontDetail.link,
+                    keyfont: 'google',
                 });
-                 if (latestFont.length === 0) {
-                     setToastContent('No fonts uploaded yet.');
-                    setToastActive(true);
-                   return;
+                  fetchFonts() // Tải lại danh sách font
+            } else if(keyfont === 'upload') {
+                if (!createdFontData) {
+                     const latestFont = await api.datafontgg.findMany({
+                         orderBy: {
+                            createdAt: 'desc',
+                          },
+                        take: 1,
+                        filter: {
+                           keyfont: { equals: "upload" },
+                         },
+                     });
+                    if (latestFont.length === 0) {
+                        setToastContent('No fonts uploaded yet.');
+                        setToastActive(true);
+                       return;
+                    }
+                     selectedFontDetail = latestFont[0];
+                  } else {
+                      selectedFontDetail = createdFontData;
                  }
-                  selectedFontDetail = latestFont[0];
-            }
-            const selectedTags = Object.keys(selectedElements)
-                .filter((key) => selectedElements[key])
-                .join(',');
-            if (!selectedTags) {
-                setBannerContent('Please select the elements to apply the font!');
-                setBannerActive(true);
-                setLoading(false);
-                return;
-            }
+           }
 
+             const selectedTags = Object.keys(selectedElements)
+                 .filter((key) => selectedElements[key])
+                 .join(',');
+             if (!selectedTags) {
+                 setBannerContent('Please select the elements to apply the font!');
+                 setBannerActive(true);
+                 setLoading(false);
+                 return;
+            }
             const selectfontRecords = await api.selectfont.findMany({
                 filter: {
                     shopid: { equals: shopid },
@@ -496,7 +397,7 @@ export default function FontManager() {
     };
     // Hàm xóa các file đã thả vào drop zone
      const handleClearDropZone = () => {
-       setFile(null); // Reset file
+        setFile(null) // Reset file
         setFileName(''); // Reset state tên file
     };
 
