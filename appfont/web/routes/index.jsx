@@ -91,7 +91,6 @@ export default function AppPage() {
 
         {/* Section 4: Empty State Example */}
         <Layout.Section>
-          
           <LegacyCard sectioned>
             <p>Add fonts</p>
             <EmptyState

@@ -95,7 +95,7 @@ function EmbeddedApp() {
         <Link to="/" rel="home">
           home
         </Link>
-        <Link to="/about">About</Link>
+        <Link to="/about">fonts</Link>
       </NavMenu>
     </>
   );
