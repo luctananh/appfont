@@ -8,7 +8,7 @@ export const schema: GadgetModel = {
   storageKey: "LGUdS5QSiaTP",
   fields: {
     key: { type: "string", storageKey: "QHJy3Z5s76Hw" },
-    namespace: { type: "string", storageKey: "klcmSJZoML7s" },
+    namespace: { type: "string", storageKey: "nkayJ07UM9RE" },
     shopid: { type: "string", storageKey: "SaLhjNhVPSeN" },
     value: { type: "json", storageKey: "dBDgzAo5l1uM" },
   },

@@ -1,0 +1,30 @@
+.switch {
+    width: 32px;
+    height: 20px;
+    background-color: var(--p-color-icon-secondary); /* Default background */
+    border-radius: 5px;
+    position: relative;
+    cursor: pointer;
+    display: inline-block;
+    transition: background-color 0.3s ease;
+  }
+  
+  .switch.on {
+    background-color: var(--p-color-bg-inverse); /* Background color when on */
+  }
+  
+  .toggle {
+    height: 12px;
+    width: 12px;
+    border-radius: 2px;
+    background: var(--p-color-bg-surface);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    left: 4px;
+    transition: left 0.3s ease;
+  }
+  
+  .switch.on .toggle {
+    left: 16px; /* Move the toggle to the right when on */
+  }

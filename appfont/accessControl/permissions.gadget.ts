@@ -89,6 +89,8 @@ export const permissions: GadgetPermissions = {
         },
       },
       actions: {
+        applyDefaultFont: true,
+        debugFontSettings: true,
         scheduledShopifySync: true,
         update1: true,
         uploadWoff: true,

@@ -19,6 +19,8 @@ import {
 import { api } from "../api";
 import AboutPage from "../routes/about";
 import Index from "../routes/index";
+// Thêm import cho AddFontPage
+// import AddFontPage from "../routes/AddFontPage";
 import "./App.css";
 
 function Error404() {
@@ -42,6 +44,8 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
         <Route path="/about" element={<AboutPage />} />
+        // Thêm route cho AddFontPage
+        {/* <Route path="/addfont" element={<AddFontPage />} /> */}
         <Route path="*" element={<Error404 />} />
       </Route>
     )
@@ -95,7 +99,9 @@ function EmbeddedApp() {
         <Link to="/" rel="home">
           home
         </Link>
-        <Link to="/about">fonts</Link>
+        <Link to="/about">Fonts</Link>
+        {/* Thêm link đến AddFontPage */}
+        {/* <Link to="/addfont">Add Font</Link> */}
       </NavMenu>
     </>
   );

@@ -7,6 +7,7 @@ export const schema: GadgetModel = {
   type: "gadget/model-schema/v1",
   storageKey: "HHB9fzQlAYBF",
   fields: {
+    checkbox: { type: "string", storageKey: "WexP-RoFC1So" },
     keyfont: { type: "string", storageKey: "XPI_qOXoOSMT" },
     link: {
       type: "string",
@@ -18,5 +19,6 @@ export const schema: GadgetModel = {
       validations: { required: true },
       storageKey: "jNw9t2JHxei7",
     },
+    size: { type: "string", storageKey: "oumm0-_AJOXm" },
   },
 };
