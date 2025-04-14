@@ -583,7 +583,7 @@ export default function AppPage() {
 
                                                                     <div style={{ display: "flex", gap: '5px' }}>
                                                                         <Text as="p" fontWeight="bold">size:</Text>
-                                                                        <Text as="p" fontWeight="medium">{size} px</Text>
+                                                                        <Text as="p" fontWeight="medium">{size}</Text>
                                                                     </div>
 
                                                                     <div style={{ display: "flex", gap: '5px' }}>

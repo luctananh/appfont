@@ -1446,13 +1446,13 @@ export default function FontManager() {
                                         <TextField
                                             value={fontSize}
                                             type="number"
-                                            // min="1"
                                             onChange={(value) => {
                                                 const numericValue = parseInt(value, 10);
                                                 if (!isNaN(numericValue) && numericValue >= 0) {
                                                     setFontSize(value); // Cập nhật state nếu là số không âm
-                                                } else if (value === '' || value === '-') {
-                                                    setFontSize('1'); // Nếu người dùng nhập dấu trừ hoặc xóa hết, đặt về 0 (hoặc bạn có thể chọn không làm gì)
+                                                }
+                                                else if (value === '' || value === '-') {
+                                                    setFontSize(' '); // Nếu người dùng nhập dấu trừ hoặc xóa hết, đặt về 0 (hoặc bạn có thể chọn không làm gì)
                                                 }
                                             }}
                                             prefix="font-size:"
@@ -1463,9 +1463,6 @@ export default function FontManager() {
                                             onClearButtonClick={() => setFontSize('')}
                                             autoComplete="off"
                                         />
-                                        {/* <Text variant="bodySm" as="p" >
-                                            Minimum: 8px
-                                        </Text> */}
                                     </BlockStack>
                                 </Card>
                                 <div title="Save">
