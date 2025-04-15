@@ -576,10 +576,10 @@ export default function AppPage() {
                                                                         <Text as="p" fontWeight="medium">{keyfont}</Text>
                                                                     </div>
 
-                                                                    <div style={{ display: "flex", gap: '5px' }}>
+                                                                    {/* <div style={{ display: "flex", gap: '5px' }}>
                                                                         <Text as="p" fontWeight="bold">Time:</Text>
                                                                         <Text as="p" fontWeight="medium">{new Date(updatedAt).toLocaleDateString() + ' ' + new Date(updatedAt).toLocaleTimeString()}</Text>
-                                                                    </div>
+                                                                    </div> */}
 
                                                                     <div style={{ display: "flex", gap: '5px' }}>
                                                                         <Text as="p" fontWeight="bold">size:</Text>
