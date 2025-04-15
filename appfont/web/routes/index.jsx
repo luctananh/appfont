@@ -370,8 +370,8 @@ export default function AppPage() {
                             }]}
                         >
                             <VideoThumbnail
-                                videoLength={118}
-                                videoProgress={118}
+                                videoLength={420}
+                                videoProgress={420}
                                 showVideoProgress
                                 thumbnailUrl="https://blog.tcea.org/wp-content/uploads/2021/08/font-heading-image.png"
                                 onClick={() => console.log('clicked')}

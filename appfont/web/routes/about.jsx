@@ -22,7 +22,10 @@ import {
     Frame,
     DropZone,
     InlineError,
-    Spinner
+    Spinner,
+    InlineGrid,
+    RadioButton,
+    InlineStack
 } from '@shopify/polaris';
 import { NoteIcon, XIcon, } from '@shopify/polaris-icons';
 import { api } from '../api';
@@ -65,6 +68,7 @@ export default function FontManager() {
     const [deleting, setDeleting] = useState(false);
     const [showVideoCard, setShowVideoCard] = useState(false);
     const [fontSize, setFontSize] = useState('');
+    const [sizeMode, setSizeMode] = useState("default");
     const [selectedElements, setSelectedElements] = useState({
         h1: false,
         h2: false,
@@ -413,7 +417,7 @@ export default function FontManager() {
                 name: updatedFontName,
                 checkbox: selectedTagsStr,
                 keyfont: newFontType, // Set based on the selected tab
-                size: fontSize,
+                size: sizeMode === "default" ? "default" : fontSize,
             };
 
             let fontLink = fontData.link;
@@ -484,7 +488,7 @@ export default function FontManager() {
                 link: newFontType === 'google' ? fontLink : (file ? updatedFont.link : fontData.link),
                 selectedElements: selectedTagsStr,
                 keyfont: newFontType, // Using the new font type
-                fontSize: fontSize,
+                fontSize: sizeMode === "default" ? "default" : fontSize,
                 updatedAt: new Date().toISOString(),
                 // Additional metadata for better tracking
                 fontType: newFontType === 'google' ? 'google' : 'custom',
@@ -609,7 +613,7 @@ export default function FontManager() {
                     link: `https://fonts.googleapis.com/css2?family=${fontDetails.label.replace(/ /g, '+')}&display=swap`,
                     keyfont: 'google',
                     checkbox: selectedTags,
-                    size: fontSize,
+                    size: sizeMode === "default" ? "default" : fontSize,
                 });
                 fetchFonts(); // Gọi fetchFonts nếu cần cập nhật danh sách ngay
 
@@ -1079,7 +1083,13 @@ export default function FontManager() {
 
                     // Xử lý all selected
                     setAllElementsSelected(elements.length === Object.keys(selectedElements).length);
-
+                    // Xử lý size mode
+                    if (fontData.size === "default") {
+                        setSizeMode("default");
+                    } else {
+                        setSizeMode("custom");
+                        setFontSize(fontData.size || '');
+                    }
                 } catch (error) {
                     console.error('Error loading font data:', error);
                     setToastContent('Error loading font data: ' + error.message);
@@ -1110,8 +1120,8 @@ export default function FontManager() {
                                 }]}
                             >
                                 <VideoThumbnail
-                                    videoLength={118}
-                                    videoProgress={118}
+                                    videoLength={420}
+                                    videoProgress={420}
                                     showVideoProgress
                                     thumbnailUrl="https://blog.tcea.org/wp-content/uploads/2021/08/font-heading-image.png"
                                     onClick={() => console.log('clicked')}
@@ -1437,7 +1447,7 @@ export default function FontManager() {
                                 </Grid>
 
                                 {/* Custom stylesheets */}
-                                <Card>
+                                {/* <Card>
                                     <BlockStack style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                         <Text variant="headingMd" as="h6">
                                             Custom stylesheets
@@ -1464,7 +1474,57 @@ export default function FontManager() {
                                             autoComplete="off"
                                         />
                                     </BlockStack>
+                                </Card> */}
+
+                                {/* Custom stylesheets */}
+                                <Card>
+                                    <div style={{ marginBottom: "10px" }}>
+                                        <Text variant="headingMd">Custom stylesheets</Text>
+                                    </div>
+                                    <InlineGrid gap={100}>
+                                        <RadioButton
+                                            label=" Default font size "
+                                            checked={sizeMode === "default"}
+                                            onChange={() => {
+                                                setSizeMode("default");
+                                                setFontSize("default"); // Đặt giá trị mặc định
+                                            }}
+                                        />
+
+                                        <RadioButton
+                                            label=" Custom font size "
+                                            checked={sizeMode === "custom"}
+                                            onChange={() => setSizeMode("custom")}
+                                            helpText={
+                                                sizeMode === "custom" && (
+                                                    <InlineGrid gap={200}>
+                                                        {/* <InlineStack gap={200}> */}
+                                                        <BlockStack>
+                                                            <TextField
+                                                                value={fontSize === "default" ? "" : fontSize}
+                                                                type="number"
+                                                                onChange={(value) => {
+                                                                    const numericValue = parseInt(value, 10);
+                                                                    if (!isNaN(numericValue) && numericValue >= 0) {
+                                                                        setFontSize(value.toString());
+                                                                    }
+                                                                }}
+                                                                prefix="font-size:"
+                                                                placeholder="Your-Size-Settings"
+                                                                autoSize
+                                                                clearButton
+                                                                onClearButtonClick={() => setFontSize("default")}
+                                                                autoComplete="off"
+                                                            />
+                                                        </BlockStack>
+                                                        {/* </InlineStack> */}
+                                                    </InlineGrid>
+                                                )
+                                            }
+                                        />
+                                    </InlineGrid>
                                 </Card>
+
                                 <div title="Save">
                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         {isEditMode ? ( // Nếu ở chế độ chỉnh sửa, hiển thị ButtonGroup với Update và Delete
