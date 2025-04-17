@@ -338,15 +338,13 @@ export default function FontManager() {
                 isVisibilityError = true; // General specific page error
                 hasAnyError = true;
             } else if (checkedPages.customUrl) {
-                if (textFields.length === 0) {
+                const hasEmptyUrlField = textFields.some(field => field.trim() === '');
+                const allEmpty = textFields.every(field => !field.trim());
+
+                if (textFields.length === 0 || allEmpty) {
                     visibilityCustomUrlError = "Please Add at least one URL.";
-                    hasAnyError = true;
-                } else {
-                    const hasEmptyUrlField = textFields.some(field => field.trim() === '');
-                    if (hasEmptyUrlField) {
-                        visibilityCustomUrlError = "Please enter the URL.";
-                        hasAnyError = true;
-                    }
+                } else if (hasEmptyUrlField) {
+                    visibilityCustomUrlError = "Please enter the URL.";
                 }
             }
         }
@@ -424,8 +422,8 @@ export default function FontManager() {
                 setFontNameError(false); // Reset google font error state
                 hasAnyError = true;
             } else {
-                 setNameError(false);
-                 setFontNameError(false);
+                setNameError(false);
+                setFontNameError(false);
             }
         } else if (selected === 1) { // Google Fonts tab
             if (!fontNamesSelected) {
@@ -447,15 +445,13 @@ export default function FontManager() {
                 isVisibilityError = true; // General specific page error
                 hasAnyError = true;
             } else if (checkedPages.customUrl) {
-                if (textFields.length === 0) {
+                const hasEmptyUrlField = textFields.some(field => field.trim() === '');
+                const allEmpty = textFields.every(field => !field.trim());
+
+                if (textFields.length === 0 || allEmpty) {
                     visibilityCustomUrlError = "Please Add at least one URL.";
-                    hasAnyError = true;
-                } else {
-                    const hasEmptyUrlField = textFields.some(field => field.trim() === '');
-                    if (hasEmptyUrlField) {
-                        visibilityCustomUrlError = "Please enter the URL.";
-                        hasAnyError = true;
-                    }
+                } else if (hasEmptyUrlField) {
+                    visibilityCustomUrlError = "Please enter the URL.";
                 }
             }
         }
@@ -473,7 +469,7 @@ export default function FontManager() {
         setBannerActive(false); // Reset banner before potentially showing it
 
         if (hasAnyError) {
-             // Now, determine the *first* error to display in the banner
+            // Now, determine the *first* error to display in the banner
             if (areElementsMissing) {
                 setBannerContent("Drop zone can't be blank.");
                 setBannerActive(true);
@@ -482,7 +478,7 @@ export default function FontManager() {
                 setBannerActive(true);
             } else if (selected === 1 && isNameOrFontMissing) { // Check google font selection error
                 setBannerContent("Option checkbox can't be blank.");
-                 setBannerActive(true);
+                setBannerActive(true);
             } else if (isVisibilityError) {
                 setBannerContent("Option page can't be blank.");
                 setBannerActive(true);
@@ -596,7 +592,7 @@ export default function FontManager() {
                 fontSize: sizeMode === "default" ? "default" : fontSize,
                 updatedAt: new Date().toISOString(),
                 fontType: newFontType === 'google' ? 'google' : 'custom',
-                elements: selectedTagsStr.split(','),
+                // elements: selectedTagsStr.split(','),
                 fontFamily: newFontType === 'google' ? fontNamesSelected : fileName,
                 ...visibilityPayload
             };
@@ -622,7 +618,7 @@ export default function FontManager() {
             if (fontTypeChanged) {
                 setToastContent(`Font type changed to ${newFontType === 'google' ? 'Google Font' : 'Upload Font'}`);
                 setToastActive(true);
-                 // Consider delaying navigation slightly if showing a toast here
+                // Consider delaying navigation slightly if showing a toast here
             }
 
             navigate('/', {
@@ -641,187 +637,203 @@ export default function FontManager() {
     };
 
     const handleCreateUpdateSelectfont = async (keyfont, selectedFonts, createdFontData = null, visibilityData = null) => {
-        try {
-            setSaveButtonClicked(true);
-            setFontNameError(false);
-            setElementsError(false);
+        setSaveButtonClicked(true); // Keep this to trigger InlineError visibility
+        let hasAnyError = false; // Flag for overall errors
+        const shop = await api.shopifyShop.findFirst({ select: { id: true } });
+        if (!shop || !shop.id) {
+            setToastContent('Could not fetch Shop ID');
+            setToastActive(true);
+            return;
+        }
+        const shopid = String(shop.id);
 
-            let hasError = false;
+        let selectedFontDetail;
+        const selectedTags = Object.keys(selectedElements)
+            .filter((key) => selectedElements[key])
+            .join(',');
 
-            const shop = await api.shopifyShop.findFirst({ select: { id: true } });
-            if (!shop || !shop.id) {
-                throw new Error('Could not fetch Shop ID');
+        // Visibility payload setup (needed for validation and creation)
+        const currentVisibilityData = visibilityData || {
+            visibilityMode: inputs?.visibilityMode || "all",
+            checkedPages: checkedPages,
+            textFields: textFields
+        };
+        let finalCustomUrlsString = null;
+        if (currentVisibilityData.visibilityMode === "specific" && currentVisibilityData.checkedPages.customUrl) {
+            const filteredUrls = currentVisibilityData.textFields.filter(url => url.trim() !== '');
+            if (filteredUrls.length > 0) {
+                finalCustomUrlsString = filteredUrls.join(',');
             }
-            const shopid = String(shop.id);
+        }
+        const visibilityPayload = {
+            visibilityMode: currentVisibilityData.visibilityMode,
+            homePage: currentVisibilityData.checkedPages.homePage,
+            cartPage: currentVisibilityData.checkedPages.cartPage,
+            blogPage: currentVisibilityData.checkedPages.blogPage,
+            productsPage: currentVisibilityData.checkedPages.productsPage,
+            collectionsPage: currentVisibilityData.checkedPages.collectionsPage,
+            customUrl: currentVisibilityData.checkedPages.customUrl,
+            customUrls: finalCustomUrlsString,
+        };
 
-            // --- Khai báo selectedFontDetail ở đây ---
-            let selectedFontDetail;
-            // --- Lấy selectedTags một lần ở đây cho cả hai trường hợp ---
-            const selectedTags = Object.keys(selectedElements)
-                .filter((key) => selectedElements[key])
-                .join(',');
+        if (keyfont === 'google') {
 
-            // Cần đảm bảo có dữ liệu này khi gọi hàm từ nút Save của Google Font
-            const currentVisibilityData = visibilityData || {
-                visibilityMode: inputs?.visibilityMode || "all",
-                checkedPages: checkedPages,
-                textFields: textFields
-            };
-            let finalCustomUrlsString = null; // Sẽ là null hoặc một chuỗi nối bằng dấu phẩy
-            if (currentVisibilityData.visibilityMode === "specific" && currentVisibilityData.checkedPages.customUrl) {
-                const filteredUrls = currentVisibilityData.textFields.filter(url => url.trim() !== '');
-                if (filteredUrls.length > 0) {
-                    // Nối mảng thành một chuỗi duy nhất bằng dấu phẩy
-                    finalCustomUrlsString = filteredUrls.join(',');
+            // --- Step 1: VALIDATE and SET specific error states based on CURRENT check ---
+            const areElementsMissing = !selectedTags;
+            setElementsError(areElementsMissing);
+            if (areElementsMissing) hasAnyError = true;
+
+            const isFontNameMissing = !fontNamesSelected;
+            setFontNameError(isFontNameMissing);
+            if (isFontNameMissing) hasAnyError = true;
+
+            // Visibility and Font Size Validation
+            let isVisibilityError = false;
+            let visibilityCustomUrlErrorMsg = ''; // Use a distinct variable for the message
+            if (visibilityPayload.visibilityMode === 'specific') {
+                const anyPageChecked = Object.values(currentVisibilityData.checkedPages).some(isChecked => isChecked);
+                if (!anyPageChecked) {
+                    isVisibilityError = true;
+                } else if (currentVisibilityData.checkedPages.customUrl) {
+                    // Check if the array is empty OR if all existing fields are empty/whitespace
+                    if (textFields.length === 0 || textFields.every(field => field.trim() === '')) {
+                        // Error: Need to add at least one URL
+                        visibilityCustomUrlErrorMsg = "Please Add at least one URL.";
+                    } else {
+                        // Check if *any* field is empty/whitespace among non-empty array
+                        const hasEmptyUrlField = textFields.some(field => field.trim() === '');
+                        if (hasEmptyUrlField) {
+                            // Error: Need to fill in the empty field(s)
+                            visibilityCustomUrlErrorMsg = "Please enter the URL.";
+                        }
+                    }
                 }
             }
-            const visibilityPayload = {
-                visibilityMode: currentVisibilityData.visibilityMode,
-                homePage: currentVisibilityData.checkedPages.homePage,
-                cartPage: currentVisibilityData.checkedPages.cartPage,
-                blogPage: currentVisibilityData.checkedPages.blogPage,
-                productsPage: currentVisibilityData.checkedPages.productsPage,
-                collectionsPage: currentVisibilityData.checkedPages.collectionsPage,
-                customUrl: currentVisibilityData.checkedPages.customUrl,
-                customUrls: finalCustomUrlsString,
-            };
+            setCheckboxError(isVisibilityError); // For "select at least one page"
+            setCustomUrlsError(visibilityCustomUrlErrorMsg); // Set state with the specific message or ''
+            if (isVisibilityError || visibilityCustomUrlErrorMsg) hasAnyError = true; // Update hasAnyError
 
-            if (keyfont === 'google') {
-                // --- Validation cho Google Font ---
-                if (!selectedTags) {
-                    setElementsError(true);
-                    setBannerContent("Option checkbox can't be blank.");
+
+            const isFontSizeMissing = sizeMode === 'custom' && (!fontSize || String(fontSize).trim() === '');
+            setFontSizeError(isFontSizeMissing);
+            if (isFontSizeMissing) hasAnyError = true;
+
+            if (hasAnyError) {
+                let firstErrorMessage = '';
+                // Determine the *first* error sequentially for the banner
+                if (areElementsMissing) { firstErrorMessage = "Option checkbox can't be blank."; }
+                else if (isFontNameMissing) { firstErrorMessage = "The Font Name can't be blank."; }
+                else if (isVisibilityError) { firstErrorMessage = "Option page can't be blank."; }
+                // Use the message variable directly for banner content
+                else if (visibilityCustomUrlErrorMsg === "Please Add at least one URL.") { firstErrorMessage = "Please add at least one Custom URL handle when 'Custom URL handle' is checked."; }
+                else if (visibilityCustomUrlErrorMsg === "Please enter the URL.") { firstErrorMessage = "The URL field can't be blank."; } // Or "Please fill in all added..."
+                else if (isFontSizeMissing) { firstErrorMessage = "Custom font size can't be blank."; }
+
+                // Banner activation logic (remains the same)
+                if (!bannerActive) {
+                    setBannerContent(firstErrorMessage);
                     setBannerActive(true);
-                    hasError = true;
+                } else {
+                    setBannerContent(firstErrorMessage);
                 }
-                if (!fontNamesSelected) {
-                    setFontNameError(true);
-                    setBannerContent("The Font Name can't be blank.");
-                    setBannerActive(true);
-                    hasError = true;
-                }
-                if (hasError) {
-                    return;
-                }
-
-                setLoading(true); // Bắt đầu loading sau validation
-
+                return; // Stop execution
+            } else {
+                setBannerActive(false);
+                setLoading(true);
                 const fontDetails = googleFonts.find((font) => font.label === fontNamesSelected);
                 if (!fontDetails) {
-                    setBannerContent('Please select a valid font.');
+                    setBannerContent('Please select a valid font.'); // Failsafe
                     setBannerActive(true);
-                    setLoading(false); // Dừng loading nếu font không hợp lệ
+                    setLoading(false);
                     return;
                 }
 
-                // --- 1. Tạo bản ghi datafontgg TRƯỚC ---
-                const createdGoogleFontRecord = await api.datafontgg.create({
-                    name: fontDetails.label, // Sử dụng tên từ googleFonts
-                    link: `https://fonts.googleapis.com/css2?family=${fontDetails.label.replace(/ /g, '+')}&display=swap`,
-                    keyfont: 'google',
-                    checkbox: selectedTags,
-                    size: sizeMode === "default" ? "default" : fontSize,
-                    ...visibilityPayload
-                });
-                fetchFonts(); // Gọi fetchFonts nếu cần cập nhật danh sách ngay
-
-                // --- 2. Gán kết quả (với ID database) cho selectedFontDetail ---
-                selectedFontDetail = createdGoogleFontRecord;
-
-
-            } else if (keyfont === 'upload') {
-                // --- Xử lý cho Upload Font (như cũ, nhưng đảm bảo selectedFontDetail được gán) ---
-                setFontNamesSelected(createdFontData.name); // Cập nhật tên font hiển thị
-
-                // Validation selectedTags cho upload
-                if (!selectedTags) {
-                    setElementsError(true); // Thêm validation này ở đây nếu chưa có
-                    setBannerContent('Option checkbox can\'t be blank.');
-                    setBannerActive(true);
-                    // Không cần setLoading(false) vì nó được quản lý bởi uploadFileToGadget
-                    return;
-                }
-
-                if (!createdFontData) {
-                    // Logic fallback tìm font mới nhất (ít khi xảy ra nếu luồng đúng)
-                    const latestFont = await api.datafontgg.findMany({
-                        orderBy: { createdAt: 'desc' },
-                        take: 1,
-                        filter: { keyfont: { equals: "upload" } },
+                try {
+                    // 1. Create datafontgg record
+                    const createdGoogleFontRecord = await api.datafontgg.create({
+                        name: fontDetails.label,
+                        link: `https://fonts.googleapis.com/css2?family=${fontDetails.label.replace(/ /g, '+')}&display=swap`,
+                        keyfont: 'google',
+                        checkbox: selectedTags,
+                        size: sizeMode === "default" ? "default" : fontSize,
+                        ...visibilityPayload
                     });
-                    if (latestFont.length === 0) {
-                        setToastContent('No fonts uploaded yet.');
-                        setToastActive(true);
-                        return; // Thoát nếu không có font nào
-                    }
-                    selectedFontDetail = latestFont[0];
-                } else {
-                    selectedFontDetail = createdFontData; // Sử dụng dữ liệu đã được tạo
-                    setFontNamesSelected(createdFontData.name); // Cập nhật tên font hiển thị
-                }
+                    fetchFonts(); // Optional
 
-                // Không cần setLoading(true) ở đây vì đã được set trong uploadFileToGadget
-            } else {
-                // Xử lý trường hợp keyfont không hợp lệ nếu cần
-                setLoading(false); // Dừng loading nếu có
-                throw new Error(`Invalid font key type: ${keyfont}`);
+                    selectedFontDetail = createdGoogleFontRecord;
+
+                } catch (apiError) {
+                    console.error('Error creating Google Font record:', apiError);
+                    setBannerContent('Error saving Google Font: ' + apiError.message);
+                    setBannerActive(true); // Show API error
+                    setLoading(false);
+                    return; // Stop if API creation fails
+                }
             }
 
-            // --- Logic chung sau khi đã có selectedFontDetail với ID database ---
+        } else if (keyfont === 'upload') {
+            if (!createdFontData) {
+                console.warn("handleCreateUpdateSelectfont called for upload without createdFontData.");
+                setToastContent('Error processing uploaded font data.');
+                setToastActive(true);
+                return;
+            }
+            const areElementsMissing_Upload = !selectedTags; // Re-check elements here
+            setElementsError(areElementsMissing_Upload); // Set inline error state for upload context
+            if (areElementsMissing_Upload) {
+                if (!bannerActive) { // Avoid redundant banner if handleSave already showed one
+                    setBannerContent('Option checkbox can\'t be blank.');
+                    setBannerActive(true);
+                }
+                return; // Stop execution
+            }
+            selectedFontDetail = createdFontData;
+            setFontNamesSelected(createdFontData.name);
 
-            // selectedTags đã được lấy ở trên
+        } else {
+            // Invalid keyfont type
+            setLoading(false);
+            setBannerContent(`Invalid font key type: ${keyfont}`);
+            setBannerActive(true);
+            return;
+        }
 
+        try {
             const selectfontRecords = await api.selectfont.findMany({
-                filter: {
-                    shopid: { equals: shopid },
-                    namespace: { equals: 'setting' },
-                    key: { equals: 'style' },
-                },
+                filter: { shopid: { equals: shopid }, namespace: { equals: 'setting' }, key: { equals: 'style' } },
             });
 
             const finalVisibilityForSelect = {
-                visibilityMode: selectedFontDetail.visibilityMode || visibilityPayload.visibilityMode,
-                homePage: selectedFontDetail.homePage ?? visibilityPayload.homePage, // Use nullish coalescing
-                cartPage: selectedFontDetail.cartPage ?? visibilityPayload.cartPage,
-                blogPage: selectedFontDetail.blogPage ?? visibilityPayload.blogPage,
-                productsPage: selectedFontDetail.productsPage ?? visibilityPayload.productsPage,
-                collectionsPage: selectedFontDetail.collectionsPage ?? visibilityPayload.collectionsPage,
-                customUrl: selectedFontDetail.customUrl ?? visibilityPayload.customUrl,
-                // Lấy customUrls từ selectedFontDetail (đã là null hoặc mảng từ DB)
+                visibilityMode: selectedFontDetail.visibilityMode || 'all',
+                homePage: selectedFontDetail.homePage ?? false,
+                cartPage: selectedFontDetail.cartPage ?? false,
+                blogPage: selectedFontDetail.blogPage ?? false,
+                productsPage: selectedFontDetail.productsPage ?? false,
+                collectionsPage: selectedFontDetail.collectionsPage ?? false,
+                customUrl: selectedFontDetail.customUrl ?? false,
                 customUrls: selectedFontDetail.customUrls,
             };
-            // --- 3. Tạo đối tượng value với ID database chính xác ---
+
             const value = {
-                id: selectedFontDetail.id, // <-- Luôn là ID database
+                id: selectedFontDetail.id,
                 name: selectedFontDetail.name,
                 link: selectedFontDetail.link,
                 selectedElements: selectedTags,
-                keyfont: selectedFontDetail.keyfont, // Thêm keyfont vào value
-                fontSize: fontSize,
-                updatedAt: new Date().toISOString(), // Thêm timestamp
+                keyfont: selectedFontDetail.keyfont,
+                fontSize: selectedFontDetail.size,
+                updatedAt: new Date().toISOString(),
                 ...finalVisibilityForSelect
             };
 
-            // --- Tạo hoặc cập nhật bản ghi selectfont (như cũ) ---
-            let data; // Đổi tên biến để tránh trùng lặp
             if (selectfontRecords.length === 0) {
-                data = await api.selectfont.create({
-                    // selectfont: { // Cấu trúc cũ
-                    shopid: shopid,
-                    namespace: 'setting',
-                    key: 'style',
-                    value: value,
-                    // }
-                });
+                await api.selectfont.create({ shopid: shopid, namespace: 'setting', key: 'style', value: value });
             } else {
-                data = await api.selectfont.update(selectfontRecords[0].id, {
-                    // selectfont: { // Cấu trúc cũ
-                    value: value,
-                    // }
-                });
+                await api.selectfont.update(selectfontRecords[0].id, { value: value });
             }
+
+            // Update local UI state *after* successful save/update
             if (value && value.selectedElements) {
-                const selectedTags = value.selectedElements.split(',');
+                const tagsArray = value.selectedElements.split(',');
                 const initialSelectedElements = {
                     h1: false,
                     h2: false,
@@ -832,14 +844,11 @@ export default function FontManager() {
                     body: false,
                     p: false,
                     a: false,
-                    li: false,
+                    li: false
                 };
-                selectedTags.forEach((tag) => {
-                    if (initialSelectedElements.hasOwnProperty(tag)) {
-                        initialSelectedElements[tag] = true;
-                    }
-                });
+                tagsArray.forEach((tag) => { if (initialSelectedElements.hasOwnProperty(tag)) { initialSelectedElements[tag] = true; } });
                 setSelectedElements(initialSelectedElements);
+                setAllElementsSelected(tagsArray.length === Object.keys(initialSelectedElements).length);
             } else {
                 setSelectedElements({
                     h1: false,
@@ -851,16 +860,11 @@ export default function FontManager() {
                     body: false,
                     p: false,
                     a: false,
-                    li: false,
+                    li: false
                 });
+                setAllElementsSelected(false);
             }
             setFontDetails(selectedFontDetail);
-
-            await api.update1();
-            setToastContent('Font applied successfully!');
-            setToastActive(true);
-            setBannerActive(false);
-            // Cập nhật lại state visibility của trang hiện tại dựa trên font vừa áp dụng
             handleInputChange("visibilityMode", value.visibilityMode);
             setCheckedPages({
                 homePage: value.homePage,
@@ -868,17 +872,25 @@ export default function FontManager() {
                 blogPage: value.blogPage,
                 productsPage: value.productsPage,
                 collectionsPage: value.collectionsPage,
-                customUrl: value.customUrl,
+                customUrl: value.customUrl
             });
-            setTextFields(value.customUrls || []);
             const urlsArrayForUI = value.customUrls ? value.customUrls.split(',') : [];
             setTextFields(urlsArrayForUI.length > 0 ? urlsArrayForUI : ['']);
-        } catch (error) {
-            console.error('Error creating/updating selectfont:', error);
-            setToastContent('Error saving selected font: ' + error.message);
+
+            await api.update1(); // Apply font to theme
+
+            setToastContent('Font applied successfully!');
             setToastActive(true);
+            setBannerActive(false); // Ensure banner off on final success
+
+            navigate('/', { state: { toastMessage: 'Font saved successfully!' } });
+
+        } catch (error) {
+            console.error('Error creating/updating selectfont or applying theme:', error);
+            setBannerContent('Error applying font: ' + error.message); // Show final step errors
+            setBannerActive(true);
         } finally {
-            setLoading(false);
+            setLoading(false); // Ensure loading stops
         }
     };
 
@@ -1075,14 +1087,12 @@ export default function FontManager() {
             ...prevInputs,
             [name]: value
         }));
-        // Xóa logic setCheckboxError và setCustomUrlsError ở đây
     }, [setInputs]); // Chỉ cần dependency setInputs
 
     // handleChanger: Chỉ cập nhật checkedPages, không set lỗi ngay
     const handleChanger = useCallback((pageKey, isChecked) => {
         setCheckedPages(prev => {
             const newState = { ...prev, [pageKey]: isChecked };
-            // Xóa logic setCheckboxError và setCustomUrlsError ở đây
             return newState;
         });
     }, []); // Không cần dependency ở đây
@@ -1092,7 +1102,6 @@ export default function FontManager() {
         setTextFields(prev => {
             const newFields = [...prev];
             newFields[index] = value;
-            // Xóa logic setCustomUrlsError ở đây
             return newFields;
         });
     };
@@ -1100,14 +1109,12 @@ export default function FontManager() {
     // handleAddField: Chỉ thêm field, không set lỗi ngay
     const handleAddField = () => {
         setTextFields(prev => [...prev, '']);
-        // Xóa logic setCustomUrlsError ở đây
     };
 
     // handleRemoveField: Chỉ xóa field, không set lỗi ngay
     const handleRemoveField = (indexToRemove) => {
         setTextFields(prev => {
             const newFields = prev.filter((_, index) => index !== indexToRemove);
-            // Xóa logic setCustomUrlsError ở đây
             return newFields;
         });
     };
@@ -1252,8 +1259,16 @@ export default function FontManager() {
                     // Xử lý selected elements
                     const elements = fontData.checkbox?.split(',') || [];
                     const newSelectedElements = {
-                        h1: false, h2: false, h3: false, h4: false, h5: false,
-                        h6: false, body: false, p: false, a: false, li: false
+                        h1: false, 
+                        h2: false, 
+                        h3: false, 
+                        h4: false, 
+                        h5: false,
+                        h6: false, 
+                        body: false, 
+                        p: false, 
+                        a: false, 
+                        li: false
                     }; // Khởi tạo lại để tránh lỗi stale state
                     elements.forEach(tag => {
                         if (newSelectedElements.hasOwnProperty(tag)) {
@@ -1276,8 +1291,6 @@ export default function FontManager() {
 
                     // Cập nhật Visibility Mode
                     if (fontData.visibilityMode) {
-                        // !!! QUAN TRỌNG: Không gọi handleInputChange ở đây vì nó sẽ gây vòng lặp hoặc state không nhất quán
-                        // Thay vào đó, cập nhật trực tiếp state `inputs`
                         setInputs(prev => ({ ...prev, visibilityMode: fontData.visibilityMode }));
                     } else {
                         setInputs(prev => ({ ...prev, visibilityMode: 'all' }));
@@ -1293,31 +1306,51 @@ export default function FontManager() {
                         customUrl: fontData.customUrl || false,
                     });
 
-                    // --- SỬA Ở ĐÂY: Chỉ giữ lại dòng chuyển đổi đúng ---
-                    // Chuyển đổi chuỗi customUrls (hoặc null) thành mảng cho state
                     const urlsString = fontData.customUrls; // Là null hoặc "url1,url2"
                     const urlsArray = urlsString ? urlsString.split(',') : []; // Tách chuỗi bằng dấu phẩy, hoặc mảng rỗng nếu là null/rỗng
                     // Đảm bảo luôn có ít nhất một ô input trống nếu không có URL nào
                     setTextFields(urlsArray.length > 0 ? urlsArray : ['']);
-                    // --- XÓA DÒNG NÀY ĐI ---
-                    // setTextFields(fontData.customUrls || []); // <--- XÓA DÒNG NÀY
-
                 } catch (error) {
                     console.error('Error loading font data:', error);
                     setToastContent('Error loading font data: ' + error.message);
                     setToastActive(true);
                 }
             } else {
-                // Reset state khi không ở edit mode hoặc không có fontId
-                // (Tùy chọn, nhưng giúp tránh lỗi khi chuyển trang)
                 setFileName('');
                 setFile(null);
-                setSelectedElements({ h1: false, h2: false, h3: false, h4: false, h5: false, h6: false, body: false, p: false, a: false, li: false });
+                setSelectedElements({ 
+                    h1: false, 
+                    h2: false, 
+                    h3: false, 
+                    h4: false, 
+                    h5: false, 
+                    h6: false, 
+                    body: false, 
+                    p: false, 
+                    a: false, 
+                    li: false 
+                });
                 setAllElementsSelected(false);
                 setSizeMode('default');
                 setFontSize('default');
-                setInputs({ visibilityMode: 'all', homePage: false, cartPage: false, blogPage: false, productsPage: false, collectionsPage: false, customUrl: false, customUrls: [] });
-                setCheckedPages({ homePage: false, cartPage: false, blogPage: false, productsPage: false, collectionsPage: false, customUrl: false });
+                setInputs({ 
+                    visibilityMode: 'all', 
+                    homePage: false, 
+                    artPage: false, 
+                    blogPage: false, 
+                    productsPage: false, 
+                    collectionsPage: false, 
+                    customUrl: false,
+                    customUrls: [] 
+                });
+                setCheckedPages({ 
+                    homePage: false, 
+                    cartPage: false, 
+                    blogPage: false, 
+                    productsPage: false, 
+                    collectionsPage: false, 
+                    customUrl: false 
+                });
                 setTextFields(['']);
                 setSelected(0); // Quay về tab upload mặc định
                 setFontNamesSelected('');
@@ -1325,8 +1358,6 @@ export default function FontManager() {
         };
 
         loadFontData();
-        // Bỏ các handler khỏi dependencies để tránh chạy lại khi state của handler thay đổi.
-        // Chỉ chạy khi isEditMode hoặc fontIdFromUrl thay đổi.
     }, [isEditMode, fontIdFromUrl]);
 
     return (
@@ -1470,9 +1501,6 @@ export default function FontManager() {
                                                         onChange={handleNameChange}
                                                     />
                                                     {saveButtonClicked && nameError && <InlineError message="Please enter a font name" fieldID="nameFileError" />}
-                                                    {/* <p >
-                                                    The font name should be unique and simple text, no special characters.
-                                                </p> */}
                                                 </BlockStack>
                                             )}
 
@@ -1705,7 +1733,7 @@ export default function FontManager() {
                                                     sizeMode === "custom" && (
                                                         <InlineGrid gap={200} >
                                                             {/* <InlineStack gap={200}> */}
-                                                            <BlockStack style={{ maxWidth: '30%' }}>
+                                                            <BlockStack style={{ maxWidth: '90%' }}>
                                                                 <TextField
                                                                     value={fontSize === "default" ? "" : fontSize}
                                                                     type="number"
@@ -1714,10 +1742,10 @@ export default function FontManager() {
                                                                         const numericValue = parseInt(value, 10);
                                                                         if (!isNaN(numericValue) && numericValue >= 0) {
                                                                             setFontSize(value.toString());
-                                                                            //setFontSizeError(false); // Reset lỗi ngay khi người dùng nhập hợp lệ (tùy chọn)
+                                                                            setFontSizeError(false); // Reset lỗi ngay khi người dùng nhập hợp lệ (tùy chọn)
                                                                         } else if (value === '') {
                                                                             setFontSize(''); // Cho phép xóa thành rỗng
-                                                                            // Không reset lỗi ở đây, để validation khi save xử lý
+                                                                            setFontSizeError(true);
                                                                         }
                                                                         // Không cho nhập số âm hoặc ký tự khác
                                                                     }}
@@ -1816,8 +1844,7 @@ export default function FontManager() {
                                                                         )}
                                                                     {/* Hiển thị TextField khi checkbox "Custom URL" được chọn */}
                                                                     {checkedPages.customUrl && (
-                                                                        <BlockStack  >
-                                                                            {/* Các ô nhập URL động */}
+                                                                        <BlockStack>
                                                                             {textFields.map((field, index) => (
                                                                                 <BlockStack key={index} style={{ flexDirection: 'column', marginTop: '5px', marginLeft: '26px' }}>
                                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '5px' }}>
@@ -1826,32 +1853,30 @@ export default function FontManager() {
                                                                                             onChange={(value) => handleTextFieldChange(index, value)}
                                                                                             placeholder="your-url-handle"
                                                                                             autoComplete="off"
-                                                                                            // required
-                                                                                            prefix="/" // Thêm thuộc tính prefix
-                                                                                            error={saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && customUrlsError !== "Please Add at least one URL." ? true : false}
+                                                                                            prefix="/"
+                                                                                            error={saveButtonClicked && checkedPages.customUrl && !field.trim()}
                                                                                         />
-                                                                                        {/* Thay thế div bằng Button */}
                                                                                         <Button
                                                                                             icon={DeleteIcon}
                                                                                             tone="base"
                                                                                             onClick={() => handleRemoveField(index)}
-                                                                                            size="small" // Thêm size small để button nhỏ hơn
+                                                                                            size="small"
                                                                                             disabled={textFields.length <= 1}
                                                                                         />
                                                                                     </div>
-                                                                                    {/* {saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && customUrlsError !== "Please Add at least one URL." && <InlineError message={customUrlsError} fieldID={`customUrl-${index}`} />}  */}
-                                                                                    {saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && <InlineError message="Please enter a URL handle." fieldID={`customUrl-${index}`} />}
+                                                                                    {saveButtonClicked && checkedPages.customUrl && !field.trim() && (
+                                                                                        <InlineError message="Please enter the URL." fieldID={`customUrl-${index}`} />
+                                                                                    )}
                                                                                 </BlockStack>
                                                                             ))}
 
-                                                                            {/* Nút Thêm TextField */}
                                                                             <div style={{ marginTop: '5px', marginBottom: '6px', marginLeft: '26px' }}>
-                                                                                <Button icon={PlusIcon} onClick={handleAddField} >
+                                                                                <Button icon={PlusIcon} onClick={handleAddField}>
                                                                                     Add URL
                                                                                 </Button>
                                                                             </div>
-                                                                            {/* {saveButtonClicked && customUrlsError === "Please Add at least one URL." && textFields.length === 0 && <InlineError message={customUrlsError} />} */}
-                                                                            {saveButtonClicked && customUrlsError === "Please Add at least one URL." && textFields.length === 0 && <InlineError message="Please add at least one URL handle." />}
+
+                                                                            {saveButtonClicked && checkedPages.customUrl && textFields.every(field => !field.trim())}
                                                                         </BlockStack>
                                                                     )}
                                                                 </BlockStack>
@@ -1865,8 +1890,8 @@ export default function FontManager() {
                                 </Card>
                                 {/* </Grid.Cell> */}
                                 {/* </Grid> */}
-                                {/* Visibility */}
 
+                                {/* Visibility */}
                                 <div title="Save">
                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                                         {isEditMode ? ( // Nếu ở chế độ chỉnh sửa, hiển thị ButtonGroup với Update và Delete
