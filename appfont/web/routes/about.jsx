@@ -27,7 +27,7 @@ import {
     RadioButton,
     InlineStack
 } from '@shopify/polaris';
-import { NoteIcon, XIcon, } from '@shopify/polaris-icons';
+import { NoteIcon, XIcon, DeleteIcon, PlusIcon } from '@shopify/polaris-icons';
 import { api } from '../api';
 import { debounce } from 'lodash';
 
@@ -81,7 +81,29 @@ export default function FontManager() {
         a: false,
         li: false,
     });
-
+    const [inputs, setInputs] = useState({
+        visibilityMode: 'all', // Giá trị khởi tạo mặc định, ví dụ: 'all' hoặc 'specific'
+        homePage: false,          // Giá trị mặc định cho homePage
+        cartPage: false,          // Giá trị mặc định cho cartPage
+        blogPage: false,          // Giá trị mặc định cho blogPage
+        productsPage: false,      // Giá trị mặc định cho Products
+        collectionsPage: false,   // Giá trị mặc định cho Collections
+        customUrl: false,         // Giá trị mặc định cho customUrl
+        customUrls: [],           // Giá trị mặc định cho customUrls
+    });
+    // Giả sử bạn cũng cần các state và hàm xử lý cho phần Visibility, thêm chúng vào đây:
+    const [checkedPages, setCheckedPages] = useState({
+        homePage: false,
+        cartPage: false,
+        blogPage: false,
+        productsPage: false,
+        collectionsPage: false,
+        customUrl: false,
+    });
+    const [textFields, setTextFields] = useState(['']); // State cho các URL tùy chỉnh
+    const [checkboxError, setCheckboxError] = useState(false); // State cho lỗi checkbox
+    const [customUrlsError, setCustomUrlsError] = useState(''); // State cho lỗi URL tùy chỉnh
+    const [fontSizeError, setFontSizeError] = useState(false);
     const uploadedFontFaceRef = useRef(null);
     const validImageTypes = ['image/gif', 'image/jpeg', 'image/png'];
     const alphabetUpper = "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z";
@@ -161,7 +183,7 @@ export default function FontManager() {
         }
     };
 
-    const uploadFileToGadget = async (file, keyfont) => {
+    const uploadFileToGadget = async (file, keyfont, visibilityData) => {
         setLoading(true);
         try {
             const reader = new FileReader();
@@ -172,18 +194,35 @@ export default function FontManager() {
                     .filter((key) => selectedElements[key])
                     .join(',');
                 try {
-                    const response = await api.datafontgg.create({
+                    let finalCustomUrlsString = null;
+                    if (visibilityData.visibilityMode === "specific" && visibilityData.checkedPages.customUrl) {
+                        const filteredUrls = visibilityData.textFields.filter(url => url.trim() !== '');
+                        if (filteredUrls.length > 0) {
+                            // Nối mảng thành một chuỗi duy nhất bằng dấu phẩy
+                            finalCustomUrlsString = filteredUrls.join(',');
+                        }
+                        // Nếu filteredUrls rỗng, finalCustomUrlsString vẫn là null
+                    }
+                    const createPayload = {
                         name: fileName,
                         link: base64Data,
                         keyfont: keyfont,
                         checkbox: selectedTags,
-                        size: fontSize,
-                    });
-
+                        size: sizeMode === "default" ? "default" : fontSize,
+                        visibilityMode: visibilityData.visibilityMode,
+                        homePage: visibilityData.checkedPages.homePage,
+                        cartPage: visibilityData.checkedPages.cartPage,
+                        blogPage: visibilityData.checkedPages.blogPage,
+                        productsPage: visibilityData.checkedPages.productsPage,
+                        collectionsPage: visibilityData.checkedPages.collectionsPage,
+                        customUrl: visibilityData.checkedPages.customUrl,
+                        // Chỉ lưu customUrls nếu customUrl được check và visibilityMode là specific
+                        customUrls: finalCustomUrlsString,
+                    };
+                    const response = await api.datafontgg.create(createPayload);
                     setFontNamesSelected(fileName);
-
                     fetchFonts();
-                    await handleCreateUpdateSelectfont(keyfont, null, response);
+                    await handleCreateUpdateSelectfont(keyfont, null, response, visibilityData);
                 } catch (error) {
                     console.error('Error uploading/updating file to Gadget:', error);
                     setToastContent('Upload failed. Please try again: ' + error.message);
@@ -271,111 +310,204 @@ export default function FontManager() {
     }, []);
 
     const handleSave = async () => {
-        setSaveButtonClicked(true); // Set state khi nút save được ấn
-        // Reset error messages before validation
-        setFileError(false);
-        setNameError(false);
-        setElementsError(false);
+        setSaveButtonClicked(true); // Set flag that button was clicked
 
-        let hasError = false;
+        // --- Step 1: Set ALL individual error states for InlineError display ---
+        let hasAnyError = false; // Flag to track if any validation fails
 
-        if (!file) {
-            setFileError(true);
-            setBannerContent("Drop zone can't be blank."); // Updated banner message
-            setBannerActive(true);
-            hasError = true;
-        }
-        if (!fileName) {
-            setNameError(true);
-            setBannerContent("The name field can't be blank."); // Updated banner message
-            setBannerActive(true);
-            hasError = true;
-        }
+        const isFileMissing = !file;
+        setFileError(isFileMissing);
+        if (isFileMissing) hasAnyError = true;
+
+        const isNameMissing = !fileName;
+        setNameError(isNameMissing);
+        if (isNameMissing) hasAnyError = true;
+
         const selectedTags = Object.keys(selectedElements)
             .filter((key) => selectedElements[key])
             .join(',');
-        if (!selectedTags) {
-            setElementsError(true);
-            setBannerContent("Option checkbox can't be blank."); // Keep original message for elements
-            setBannerActive(true);
-            hasError = true;
+        const areElementsMissing = !selectedTags;
+        setElementsError(areElementsMissing);
+        if (areElementsMissing) hasAnyError = true;
+
+        let isVisibilityError = false;
+        let visibilityCustomUrlError = ''; // Reset specific custom URL error message
+        if (inputs.visibilityMode === 'specific') {
+            const anyPageChecked = Object.values(checkedPages).some(isChecked => isChecked);
+            if (!anyPageChecked) {
+                isVisibilityError = true; // General specific page error
+                hasAnyError = true;
+            } else if (checkedPages.customUrl) {
+                if (textFields.length === 0) {
+                    visibilityCustomUrlError = "Please Add at least one URL.";
+                    hasAnyError = true;
+                } else {
+                    const hasEmptyUrlField = textFields.some(field => field.trim() === '');
+                    if (hasEmptyUrlField) {
+                        visibilityCustomUrlError = "Please enter the URL.";
+                        hasAnyError = true;
+                    }
+                }
+            }
+        }
+        setCheckboxError(isVisibilityError); // For the "select at least one" message
+        setCustomUrlsError(visibilityCustomUrlError); // For custom URL specific messages
+
+        const isFontSizeMissing = sizeMode === 'custom' && (!fontSize || String(fontSize).trim() === '');
+        setFontSizeError(isFontSizeMissing);
+        if (isFontSizeMissing) hasAnyError = true;
+
+        // --- Step 2: Handle Banner display (sequentially show first error) ---
+        setBannerActive(false); // Reset banner before potentially showing it
+
+        if (hasAnyError) {
+            // Now, determine the *first* error to display in the banner
+            if (isFileMissing) {
+                setBannerContent("Drop zone can't be blank.");
+                setBannerActive(true);
+            } else if (isNameMissing) {
+                setBannerContent("The name field can't be blank.");
+                setBannerActive(true);
+            } else if (areElementsMissing) {
+                setBannerContent("Option checkbox can't be blank.");
+                setBannerActive(true);
+            } else if (isVisibilityError) {
+                setBannerContent("Option page can't be blank.");
+                setBannerActive(true);
+            } else if (visibilityCustomUrlError === "Please Add at least one URL.") {
+                setBannerContent("Please add at least one Custom URL handle when 'Custom URL handle' is checked.");
+                setBannerActive(true);
+            } else if (visibilityCustomUrlError === "Please enter the URL.") {
+                setBannerContent("The URL field can't be blank.");
+                setBannerActive(true);
+            } else if (isFontSizeMissing) {
+                setBannerContent("Custom font size can't be blank.");
+                setBannerActive(true);
+            }
+            return; // Stop execution since there was at least one error
         }
 
-        if (hasError) {
-            // setBannerContent("Option checkbox can't be blank."); // Optional: Show banner message for multiple errors
-            // setBannerActive(true);
-            return;
-        }
-
+        // --- Step 3: If no errors, proceed with saving ---
+        const visibilityData = {
+            visibilityMode: inputs?.visibilityMode || "all",
+            checkedPages: checkedPages,
+            textFields: textFields
+        };
         try {
-            await uploadFileToGadget(file, "upload");
-            setBannerActive(false); // Thêm dòng này để tắt banner khi lưu thành công
+            await uploadFileToGadget(file, "upload", visibilityData);
+            // Success, banner remains inactive
         } catch (error) {
             console.error('Error saving font:', error);
-            setToastContent('Failed to save font: ' + error);
-            setToastActive(true);
+            setBannerContent('Failed to save font: ' + error.message); // Show API error in banner
+            setBannerActive(true);
         }
     };
 
     const handleUpdate = async () => {
-        setSaveButtonClicked(true);
+        setSaveButtonClicked(true); // Set flag that button was clicked
         setLoading(true);
 
-        // Reset all error states
-        setNameError(false);
-        setFileError(false);
-        setFontNameError(false);
-        setElementsError(false);
+        // --- Step 1: Set ALL individual error states for InlineError display ---
+        let hasAnyError = false; // Flag to track if any validation fails
 
-        // Validate based on the active tab
-        let hasError = false;
-
-        // Common validation for both tabs: elements selection
         const selectedTags = Object.keys(selectedElements)
             .filter(key => selectedElements[key]);
-        if (selectedTags.length === 0) {
-            setElementsError(true);
-            setBannerContent("Option checkbox can't be blank."); // Keep original message for elements
-            setBannerActive(true);
-            hasError = true;
-        }
-        // Tab-specific validation
+        const areElementsMissing = selectedTags.length === 0;
+        setElementsError(areElementsMissing);
+        if (areElementsMissing) hasAnyError = true;
+
+        let isNameOrFontMissing = false;
         if (selected === 0) { // Upload Font tab
             if (!fileName) {
-                setNameError(true);
-                setBannerContent("The name field can't be blank."); // Updated banner message
-                setBannerActive(true);
-                hasError = true;
+                isNameOrFontMissing = true;
+                setNameError(true); // Set specific error state for upload name
+                setFontNameError(false); // Reset google font error state
+                hasAnyError = true;
+            } else {
+                 setNameError(false);
+                 setFontNameError(false);
             }
-            // Note: In edit mode, we don't require a new file upload
-            // so we don't check for !file here
         } else if (selected === 1) { // Google Fonts tab
             if (!fontNamesSelected) {
-                setFontNameError(true);
-                setBannerContent("The Font Name can't be blank."); // Updated banner message
-                setBannerActive(true);
-                hasError = true;
+                isNameOrFontMissing = true;
+                setFontNameError(true); // Set specific error state for google font selection
+                setNameError(false); // Reset upload name error state
+                hasAnyError = true;
+            } else {
+                setNameError(false);
+                setFontNameError(false);
             }
         }
 
-        if (hasError) {
-            // setBannerContent("Please fill all required fields");
-            // setBannerActive(true);
-            setLoading(false);
-            return;
+        let isVisibilityError = false;
+        let visibilityCustomUrlError = ''; // Reset specific custom URL error message
+        if (inputs.visibilityMode === 'specific') {
+            const anyPageChecked = Object.values(checkedPages).some(isChecked => isChecked);
+            if (!anyPageChecked) {
+                isVisibilityError = true; // General specific page error
+                hasAnyError = true;
+            } else if (checkedPages.customUrl) {
+                if (textFields.length === 0) {
+                    visibilityCustomUrlError = "Please Add at least one URL.";
+                    hasAnyError = true;
+                } else {
+                    const hasEmptyUrlField = textFields.some(field => field.trim() === '');
+                    if (hasEmptyUrlField) {
+                        visibilityCustomUrlError = "Please enter the URL.";
+                        hasAnyError = true;
+                    }
+                }
+            }
         }
+        setCheckboxError(isVisibilityError); // For the "select at least one" message
+        setCustomUrlsError(visibilityCustomUrlError); // For custom URL specific messages
 
+        const isFontSizeMissing = sizeMode === 'custom' && (!fontSize || String(fontSize).trim() === '');
+        setFontSizeError(isFontSizeMissing);
+        if (isFontSizeMissing) hasAnyError = true;
+
+        // Reset file error for update, as it's not always required
+        setFileError(false);
+
+        // --- Step 2: Handle Banner display (sequentially show first error) ---
+        setBannerActive(false); // Reset banner before potentially showing it
+
+        if (hasAnyError) {
+             // Now, determine the *first* error to display in the banner
+            if (areElementsMissing) {
+                setBannerContent("Drop zone can't be blank.");
+                setBannerActive(true);
+            } else if (selected === 0 && isNameOrFontMissing) { // Check upload name error
+                setBannerContent("The name field can't be blank.");
+                setBannerActive(true);
+            } else if (selected === 1 && isNameOrFontMissing) { // Check google font selection error
+                setBannerContent("Option checkbox can't be blank.");
+                 setBannerActive(true);
+            } else if (isVisibilityError) {
+                setBannerContent("Option page can't be blank.");
+                setBannerActive(true);
+            } else if (visibilityCustomUrlError === "Please Add at least one URL.") {
+                setBannerContent("Please add at least one Custom URL handle when 'Custom URL handle' is checked.");
+                setBannerActive(true);
+            } else if (visibilityCustomUrlError === "Please enter the URL.") {
+                setBannerContent("The URL field can't be blank.");
+                setBannerActive(true);
+            } else if (isFontSizeMissing) {
+                setBannerContent("Custom font size can't be blank.");
+                setBannerActive(true);
+            }
+            setLoading(false); // Stop loading indicator
+            return; // Stop execution since there was at least one error
+        }
+        // --- Step 3: If no errors, proceed with updating ---
         try {
-            // Get the shop ID
+            // --- Rest of the update logic remains the same ---
             const shop = await api.shopifyShop.findFirst({ select: { id: true } });
             if (!shop || !shop.id) {
                 throw new Error('Could not fetch Shop ID');
             }
             const shopid = String(shop.id);
 
-            console.log('Updating font for shop ID:', shopid);
-
-            // Get the current font data
             const fontData = await api.datafontgg.findOne(fontIdFromUrl, {
                 select: {
                     id: true,
@@ -386,56 +518,49 @@ export default function FontManager() {
                 }
             });
 
-            // Store original font type to check for changes later
             const originalFontType = fontData.keyfont;
-
-            console.log('Original font data:', {
-                id: fontData.id,
-                name: fontData.name,
-                keyfont: fontData.keyfont,
-                checkbox: fontData.checkbox
-            });
-
             const selectedTagsStr = selectedTags.join(',');
 
-            // Create update data object
-            let updatedFontName;
-            if (selected === 1) { // Google Fonts tab
-                // For Google fonts, use fontNamesSelected which contains the Google font name
-                updatedFontName = fontNamesSelected;
-                console.log('Using Google font name from selection:', updatedFontName);
-            } else {
-                // For uploaded fonts, use fileName
-                updatedFontName = fileName;
-                console.log('Using upload font name:', updatedFontName);
-            }
-
-            // Set keyfont based on selected tab index
             const newFontType = selected === 0 ? 'upload' : 'google';
+            let finalCustomUrlsString = null;
+            if (inputs?.visibilityMode === "specific" && checkedPages.customUrl) {
+                const filteredUrls = textFields.filter(url => url.trim() !== '');
+                if (filteredUrls.length > 0) {
+                    finalCustomUrlsString = filteredUrls.join(',');
+                }
+            }
+            const visibilityPayload = {
+                visibilityMode: inputs?.visibilityMode || "all",
+                homePage: checkedPages.homePage,
+                cartPage: checkedPages.cartPage,
+                blogPage: checkedPages.blogPage,
+                productsPage: checkedPages.productsPage,
+                collectionsPage: checkedPages.collectionsPage,
+                customUrl: checkedPages.customUrl,
+                customUrls: finalCustomUrlsString,
+            };
 
+            let updatedFontName;
+            if (selected === 1) {
+                updatedFontName = fontNamesSelected;
+            } else {
+                updatedFontName = fileName;
+            }
             const updateData = {
                 name: updatedFontName,
                 checkbox: selectedTagsStr,
-                keyfont: newFontType, // Set based on the selected tab
+                keyfont: newFontType,
                 size: sizeMode === "default" ? "default" : fontSize,
+                ...visibilityPayload
             };
 
             let fontLink = fontData.link;
 
-            // Handle different font types
             if (newFontType === 'google') {
-                // For Google fonts, ensure proper link format with proper encoding
-                // Use fontNamesSelected for Google fonts, not fileName
                 const formattedFontName = fontNamesSelected.trim().replace(/ /g, '+');
                 fontLink = `https://fonts.googleapis.com/css2?family=${formattedFontName}&display=swap`;
                 updateData.link = fontLink;
-
-                console.log('Updating Google font with name:', fontNamesSelected);
-                console.log('Formatted font name for URL:', formattedFontName);
-                console.log('Google font link:', fontLink);
             } else if (file) {
-                // For uploaded fonts with new file
-                console.log('Processing new uploaded font file:', fileName);
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
 
@@ -444,33 +569,16 @@ export default function FontManager() {
                         const base64Data = reader.result.split(',')[1];
                         updateData.link = base64Data;
                         fontLink = base64Data;
-                        console.log('New font file processed successfully');
-                        console.log('Font data size:', base64Data.length, 'bytes');
                         resolve();
                     };
                     reader.onerror = (error) => {
-                        console.error('Error reading font file:', error);
                         reject(error);
                     };
                 });
-            } else {
-                console.log('Keeping existing font link:', fontLink ? `${fontLink.substring(0, 30)}...` : 'none');
             }
 
-            // Update the datafontgg record
-            console.log('Updating datafontgg record with:', {
-                id: fontIdFromUrl,
-                name: updateData.name,
-                keyfont: updateData.keyfont,
-                checkbox: updateData.checkbox,
-                linkType: typeof updateData.link,
-                linkLength: updateData.link ? updateData.link.length : 0
-            });
-
             const updatedFont = await api.datafontgg.update(fontIdFromUrl, updateData);
-            console.log('Font record updated successfully:', updatedFont.id);
 
-            // Find any existing selectfont record
             const selectfontRecords = await api.selectfont.findMany({
                 filter: {
                     shopid: { equals: shopid },
@@ -479,35 +587,21 @@ export default function FontManager() {
                 },
             });
 
-            console.log('Found selectfont records:', selectfontRecords.length);
-
-            // Create a robust value object for the selectfont record
             const value = {
                 id: updatedFont.id,
                 name: updatedFont.name,
                 link: newFontType === 'google' ? fontLink : (file ? updatedFont.link : fontData.link),
                 selectedElements: selectedTagsStr,
-                keyfont: newFontType, // Using the new font type
+                keyfont: newFontType,
                 fontSize: sizeMode === "default" ? "default" : fontSize,
                 updatedAt: new Date().toISOString(),
-                // Additional metadata for better tracking
                 fontType: newFontType === 'google' ? 'google' : 'custom',
                 elements: selectedTagsStr.split(','),
-                // Use the appropriate font family name based on the font type
                 fontFamily: newFontType === 'google' ? fontNamesSelected : fileName,
+                ...visibilityPayload
             };
 
-            console.log('Updating selectfont with value:', {
-                id: value.id,
-                name: value.name,
-                keyfont: value.keyfont,
-                selectedElements: value.selectedElements,
-                fontFamily: value.fontFamily,
-                fontType: value.fontType
-            });
-
             if (selectfontRecords.length === 0) {
-                console.log('Creating new selectfont record');
                 await api.selectfont.create({
                     shopid: shopid,
                     namespace: 'setting',
@@ -515,48 +609,38 @@ export default function FontManager() {
                     value: value,
                 });
             } else {
-                console.log('Updating existing selectfont record:', selectfontRecords[0].id);
                 await api.selectfont.update(selectfontRecords[0].id, {
                     value: value,
                 });
             }
 
-            // Call update1 global action to update the theme font
-            try {
-                console.log('Applying font changes to theme');
-                await api.update1();
-                console.log('Theme update completed successfully');
-            } catch (error) {
-                console.error('Theme update error:', error);
-                throw new Error('Failed to update theme: ' + error.message);
-            }
+            await api.update1();
 
-            // Check if font type has changed and show appropriate notification
             const fontTypeChanged = originalFontType !== newFontType;
             let successMessage = 'Font updated successfully!';
 
             if (fontTypeChanged) {
                 setToastContent(`Font type changed to ${newFontType === 'google' ? 'Google Font' : 'Upload Font'}`);
                 setToastActive(true);
+                 // Consider delaying navigation slightly if showing a toast here
             }
 
-            // Navigate and show notification
             navigate('/', {
                 state: {
                     toastMessage: successMessage
                 }
             });
-
+            // --- End of update logic ---
         } catch (error) {
             console.error('Error updating font:', error);
-            setToastContent('Failed to update font: ' + error.message);
-            setToastActive(true);
+            setBannerContent('Failed to update font: ' + error.message); // Show API error in banner
+            setBannerActive(true);
         } finally {
-            setLoading(false);
+            setLoading(false); // Ensure loading stops even on error
         }
     };
 
-    const handleCreateUpdateSelectfont = async (keyfont, selectedFonts, createdFontData = null) => {
+    const handleCreateUpdateSelectfont = async (keyfont, selectedFonts, createdFontData = null, visibilityData = null) => {
         try {
             setSaveButtonClicked(true);
             setFontNameError(false);
@@ -577,6 +661,30 @@ export default function FontManager() {
                 .filter((key) => selectedElements[key])
                 .join(',');
 
+            // Cần đảm bảo có dữ liệu này khi gọi hàm từ nút Save của Google Font
+            const currentVisibilityData = visibilityData || {
+                visibilityMode: inputs?.visibilityMode || "all",
+                checkedPages: checkedPages,
+                textFields: textFields
+            };
+            let finalCustomUrlsString = null; // Sẽ là null hoặc một chuỗi nối bằng dấu phẩy
+            if (currentVisibilityData.visibilityMode === "specific" && currentVisibilityData.checkedPages.customUrl) {
+                const filteredUrls = currentVisibilityData.textFields.filter(url => url.trim() !== '');
+                if (filteredUrls.length > 0) {
+                    // Nối mảng thành một chuỗi duy nhất bằng dấu phẩy
+                    finalCustomUrlsString = filteredUrls.join(',');
+                }
+            }
+            const visibilityPayload = {
+                visibilityMode: currentVisibilityData.visibilityMode,
+                homePage: currentVisibilityData.checkedPages.homePage,
+                cartPage: currentVisibilityData.checkedPages.cartPage,
+                blogPage: currentVisibilityData.checkedPages.blogPage,
+                productsPage: currentVisibilityData.checkedPages.productsPage,
+                collectionsPage: currentVisibilityData.checkedPages.collectionsPage,
+                customUrl: currentVisibilityData.checkedPages.customUrl,
+                customUrls: finalCustomUrlsString,
+            };
 
             if (keyfont === 'google') {
                 // --- Validation cho Google Font ---
@@ -593,7 +701,6 @@ export default function FontManager() {
                     hasError = true;
                 }
                 if (hasError) {
-                    // Không cần setLoading(false) ở đây vì chưa set true
                     return;
                 }
 
@@ -614,6 +721,7 @@ export default function FontManager() {
                     keyfont: 'google',
                     checkbox: selectedTags,
                     size: sizeMode === "default" ? "default" : fontSize,
+                    ...visibilityPayload
                 });
                 fetchFonts(); // Gọi fetchFonts nếu cần cập nhật danh sách ngay
 
@@ -649,6 +757,7 @@ export default function FontManager() {
                     selectedFontDetail = latestFont[0];
                 } else {
                     selectedFontDetail = createdFontData; // Sử dụng dữ liệu đã được tạo
+                    setFontNamesSelected(createdFontData.name); // Cập nhật tên font hiển thị
                 }
 
                 // Không cần setLoading(true) ở đây vì đã được set trong uploadFileToGadget
@@ -670,6 +779,17 @@ export default function FontManager() {
                 },
             });
 
+            const finalVisibilityForSelect = {
+                visibilityMode: selectedFontDetail.visibilityMode || visibilityPayload.visibilityMode,
+                homePage: selectedFontDetail.homePage ?? visibilityPayload.homePage, // Use nullish coalescing
+                cartPage: selectedFontDetail.cartPage ?? visibilityPayload.cartPage,
+                blogPage: selectedFontDetail.blogPage ?? visibilityPayload.blogPage,
+                productsPage: selectedFontDetail.productsPage ?? visibilityPayload.productsPage,
+                collectionsPage: selectedFontDetail.collectionsPage ?? visibilityPayload.collectionsPage,
+                customUrl: selectedFontDetail.customUrl ?? visibilityPayload.customUrl,
+                // Lấy customUrls từ selectedFontDetail (đã là null hoặc mảng từ DB)
+                customUrls: selectedFontDetail.customUrls,
+            };
             // --- 3. Tạo đối tượng value với ID database chính xác ---
             const value = {
                 id: selectedFontDetail.id, // <-- Luôn là ID database
@@ -678,7 +798,8 @@ export default function FontManager() {
                 selectedElements: selectedTags,
                 keyfont: selectedFontDetail.keyfont, // Thêm keyfont vào value
                 fontSize: fontSize,
-                updatedAt: new Date().toISOString() // Thêm timestamp
+                updatedAt: new Date().toISOString(), // Thêm timestamp
+                ...finalVisibilityForSelect
             };
 
             // --- Tạo hoặc cập nhật bản ghi selectfont (như cũ) ---
@@ -739,13 +860,19 @@ export default function FontManager() {
             setToastContent('Font applied successfully!');
             setToastActive(true);
             setBannerActive(false);
-            // navigate('/', {
-            //     state: {
-            //         toastMessage: 'Font applied successfully!',
-            //         // Sử dụng ID database chính xác từ selectedFontDetail
-            //         appliedFontId: selectedFontDetail.id
-            //     }
-            // });
+            // Cập nhật lại state visibility của trang hiện tại dựa trên font vừa áp dụng
+            handleInputChange("visibilityMode", value.visibilityMode);
+            setCheckedPages({
+                homePage: value.homePage,
+                cartPage: value.cartPage,
+                blogPage: value.blogPage,
+                productsPage: value.productsPage,
+                collectionsPage: value.collectionsPage,
+                customUrl: value.customUrl,
+            });
+            setTextFields(value.customUrls || []);
+            const urlsArrayForUI = value.customUrls ? value.customUrls.split(',') : [];
+            setTextFields(urlsArrayForUI.length > 0 ? urlsArrayForUI : ['']);
         } catch (error) {
             console.error('Error creating/updating selectfont:', error);
             setToastContent('Error saving selected font: ' + error.message);
@@ -942,6 +1069,48 @@ export default function FontManager() {
             </div>
         </BlockStack>
     );
+    // handleInputChange: Chỉ cập nhật inputs, không set lỗi ngay
+    const handleInputChange = useCallback((name, value) => {
+        setInputs(prevInputs => ({
+            ...prevInputs,
+            [name]: value
+        }));
+        // Xóa logic setCheckboxError và setCustomUrlsError ở đây
+    }, [setInputs]); // Chỉ cần dependency setInputs
+
+    // handleChanger: Chỉ cập nhật checkedPages, không set lỗi ngay
+    const handleChanger = useCallback((pageKey, isChecked) => {
+        setCheckedPages(prev => {
+            const newState = { ...prev, [pageKey]: isChecked };
+            // Xóa logic setCheckboxError và setCustomUrlsError ở đây
+            return newState;
+        });
+    }, []); // Không cần dependency ở đây
+
+    // handleTextFieldChange: Chỉ cập nhật textFields, không set lỗi ngay
+    const handleTextFieldChange = (index, value) => {
+        setTextFields(prev => {
+            const newFields = [...prev];
+            newFields[index] = value;
+            // Xóa logic setCustomUrlsError ở đây
+            return newFields;
+        });
+    };
+
+    // handleAddField: Chỉ thêm field, không set lỗi ngay
+    const handleAddField = () => {
+        setTextFields(prev => [...prev, '']);
+        // Xóa logic setCustomUrlsError ở đây
+    };
+
+    // handleRemoveField: Chỉ xóa field, không set lỗi ngay
+    const handleRemoveField = (indexToRemove) => {
+        setTextFields(prev => {
+            const newFields = prev.filter((_, index) => index !== indexToRemove);
+            // Xóa logic setCustomUrlsError ở đây
+            return newFields;
+        });
+    };
 
     useEffect(() => {
         fetchFonts();
@@ -1058,7 +1227,15 @@ export default function FontManager() {
                             keyfont: true,
                             link: true,
                             checkbox: true,
-                            size: true
+                            size: true,
+                            visibilityMode: true,
+                            homePage: true,
+                            cartPage: true,
+                            blogPage: true,
+                            productsPage: true,
+                            collectionsPage: true,
+                            customUrl: true,
+                            customUrls: true // Vẫn cần select trường này
                         }
                     });
 
@@ -1071,9 +1248,13 @@ export default function FontManager() {
                         setFileName(fontData.name);
                     }
                     setFontSize(fontData.size || '');
+
                     // Xử lý selected elements
                     const elements = fontData.checkbox?.split(',') || [];
-                    const newSelectedElements = { ...selectedElements };
+                    const newSelectedElements = {
+                        h1: false, h2: false, h3: false, h4: false, h5: false,
+                        h6: false, body: false, p: false, a: false, li: false
+                    }; // Khởi tạo lại để tránh lỗi stale state
                     elements.forEach(tag => {
                         if (newSelectedElements.hasOwnProperty(tag)) {
                             newSelectedElements[tag] = true;
@@ -1082,23 +1263,70 @@ export default function FontManager() {
                     setSelectedElements(newSelectedElements);
 
                     // Xử lý all selected
-                    setAllElementsSelected(elements.length === Object.keys(selectedElements).length);
+                    setAllElementsSelected(elements.length === Object.keys(newSelectedElements).length);
+
                     // Xử lý size mode
-                    if (fontData.size === "default") {
+                    if (fontData.size === "default" || !fontData.size) { // Kiểm tra cả null/undefined
                         setSizeMode("default");
+                        setFontSize("default"); // Đặt lại state nếu là default
                     } else {
                         setSizeMode("custom");
-                        setFontSize(fontData.size || '');
+                        setFontSize(fontData.size);
                     }
+
+                    // Cập nhật Visibility Mode
+                    if (fontData.visibilityMode) {
+                        // !!! QUAN TRỌNG: Không gọi handleInputChange ở đây vì nó sẽ gây vòng lặp hoặc state không nhất quán
+                        // Thay vào đó, cập nhật trực tiếp state `inputs`
+                        setInputs(prev => ({ ...prev, visibilityMode: fontData.visibilityMode }));
+                    } else {
+                        setInputs(prev => ({ ...prev, visibilityMode: 'all' }));
+                    }
+
+                    // Cập nhật Checkboxes
+                    setCheckedPages({
+                        homePage: fontData.homePage || false,
+                        cartPage: fontData.cartPage || false,
+                        blogPage: fontData.blogPage || false,
+                        productsPage: fontData.productsPage || false,
+                        collectionsPage: fontData.collectionsPage || false,
+                        customUrl: fontData.customUrl || false,
+                    });
+
+                    // --- SỬA Ở ĐÂY: Chỉ giữ lại dòng chuyển đổi đúng ---
+                    // Chuyển đổi chuỗi customUrls (hoặc null) thành mảng cho state
+                    const urlsString = fontData.customUrls; // Là null hoặc "url1,url2"
+                    const urlsArray = urlsString ? urlsString.split(',') : []; // Tách chuỗi bằng dấu phẩy, hoặc mảng rỗng nếu là null/rỗng
+                    // Đảm bảo luôn có ít nhất một ô input trống nếu không có URL nào
+                    setTextFields(urlsArray.length > 0 ? urlsArray : ['']);
+                    // --- XÓA DÒNG NÀY ĐI ---
+                    // setTextFields(fontData.customUrls || []); // <--- XÓA DÒNG NÀY
+
                 } catch (error) {
                     console.error('Error loading font data:', error);
                     setToastContent('Error loading font data: ' + error.message);
                     setToastActive(true);
                 }
+            } else {
+                // Reset state khi không ở edit mode hoặc không có fontId
+                // (Tùy chọn, nhưng giúp tránh lỗi khi chuyển trang)
+                setFileName('');
+                setFile(null);
+                setSelectedElements({ h1: false, h2: false, h3: false, h4: false, h5: false, h6: false, body: false, p: false, a: false, li: false });
+                setAllElementsSelected(false);
+                setSizeMode('default');
+                setFontSize('default');
+                setInputs({ visibilityMode: 'all', homePage: false, cartPage: false, blogPage: false, productsPage: false, collectionsPage: false, customUrl: false, customUrls: [] });
+                setCheckedPages({ homePage: false, cartPage: false, blogPage: false, productsPage: false, collectionsPage: false, customUrl: false });
+                setTextFields(['']);
+                setSelected(0); // Quay về tab upload mặc định
+                setFontNamesSelected('');
             }
         };
 
         loadFontData();
+        // Bỏ các handler khỏi dependencies để tránh chạy lại khi state của handler thay đổi.
+        // Chỉ chạy khi isEditMode hoặc fontIdFromUrl thay đổi.
     }, [isEditMode, fontIdFromUrl]);
 
     return (
@@ -1446,84 +1674,198 @@ export default function FontManager() {
                                     </Grid.Cell>
                                 </Grid>
 
-                                {/* Custom stylesheets */}
-                                {/* <Card>
-                                    <BlockStack style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                        <Text variant="headingMd" as="h6">
-                                            Custom stylesheets
-                                        </Text>
-
-                                        <TextField
-                                            value={fontSize}
-                                            type="number"
-                                            onChange={(value) => {
-                                                const numericValue = parseInt(value, 10);
-                                                if (!isNaN(numericValue) && numericValue >= 0) {
-                                                    setFontSize(value); // Cập nhật state nếu là số không âm
-                                                }
-                                                else if (value === '' || value === '-') {
-                                                    setFontSize(' '); // Nếu người dùng nhập dấu trừ hoặc xóa hết, đặt về 0 (hoặc bạn có thể chọn không làm gì)
-                                                }
-                                            }}
-                                            prefix="font-size:"
-                                            placeholder="Your-Size-Settings"
-                                            autoSize
-                                            // suffix="px"
-                                            clearButton
-                                            onClearButtonClick={() => setFontSize('')}
-                                            autoComplete="off"
-                                        />
-                                    </BlockStack>
-                                </Card> */}
-
+                                {/* <Grid> */}
+                                {/* <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 6, xl: 6 }}> */}
                                 {/* Custom stylesheets */}
                                 <Card>
                                     <div style={{ marginBottom: "10px" }}>
                                         <Text variant="headingMd">Custom stylesheets</Text>
                                     </div>
                                     <InlineGrid gap={100}>
-                                        <RadioButton
-                                            label=" Default font size "
-                                            checked={sizeMode === "default"}
-                                            onChange={() => {
-                                                setSizeMode("default");
-                                                setFontSize("default"); // Đặt giá trị mặc định
-                                            }}
-                                        />
-
-                                        <RadioButton
-                                            label=" Custom font size "
-                                            checked={sizeMode === "custom"}
-                                            onChange={() => setSizeMode("custom")}
-                                            helpText={
-                                                sizeMode === "custom" && (
-                                                    <InlineGrid gap={200}>
-                                                        {/* <InlineStack gap={200}> */}
-                                                        <BlockStack>
-                                                            <TextField
-                                                                value={fontSize === "default" ? "" : fontSize}
-                                                                type="number"
-                                                                onChange={(value) => {
-                                                                    const numericValue = parseInt(value, 10);
-                                                                    if (!isNaN(numericValue) && numericValue >= 0) {
-                                                                        setFontSize(value.toString());
-                                                                    }
-                                                                }}
-                                                                prefix="font-size:"
-                                                                placeholder="Your-Size-Settings"
-                                                                autoSize
-                                                                clearButton
-                                                                onClearButtonClick={() => setFontSize("default")}
-                                                                autoComplete="off"
-                                                            />
-                                                        </BlockStack>
-                                                        {/* </InlineStack> */}
-                                                    </InlineGrid>
-                                                )
-                                            }
-                                        />
+                                        <BlockStack style={{ display: 'flex', flexDirection: 'column', marginLeft: '30px' }}>
+                                            <RadioButton
+                                                label=" Default font size "
+                                                checked={sizeMode === "default"}
+                                                onChange={() => {
+                                                    setSizeMode("default");
+                                                    setFontSize("default"); // Đặt giá trị mặc định
+                                                    setFontSizeError(false);
+                                                }}
+                                            />
+                                            <RadioButton
+                                                label=" Custom font size "
+                                                checked={sizeMode === "custom"}
+                                                onChange={() => {
+                                                    setSizeMode("custom");
+                                                    if (fontSize === "default" || !fontSize) {
+                                                        setFontSize('');
+                                                    }
+                                                }}
+                                                helpText={
+                                                    sizeMode === "custom" && (
+                                                        <InlineGrid gap={200} >
+                                                            {/* <InlineStack gap={200}> */}
+                                                            <BlockStack style={{ maxWidth: '30%' }}>
+                                                                <TextField
+                                                                    value={fontSize === "default" ? "" : fontSize}
+                                                                    type="number"
+                                                                    onChange={(value) => {
+                                                                        // Chỉ cập nhật nếu là số không âm
+                                                                        const numericValue = parseInt(value, 10);
+                                                                        if (!isNaN(numericValue) && numericValue >= 0) {
+                                                                            setFontSize(value.toString());
+                                                                            //setFontSizeError(false); // Reset lỗi ngay khi người dùng nhập hợp lệ (tùy chọn)
+                                                                        } else if (value === '') {
+                                                                            setFontSize(''); // Cho phép xóa thành rỗng
+                                                                            // Không reset lỗi ở đây, để validation khi save xử lý
+                                                                        }
+                                                                        // Không cho nhập số âm hoặc ký tự khác
+                                                                    }}
+                                                                    prefix="font-size:"
+                                                                    placeholder="Your-Size-Settings"
+                                                                    autoSize
+                                                                    clearButton
+                                                                    onClearButtonClick={() => {
+                                                                        setFontSize(''); // Chỉ xóa thành rỗng, không đặt "default"
+                                                                        //setFontSizeError(false); // Reset lỗi khi xóa (tùy chọn)
+                                                                    }}
+                                                                    autoComplete="off"
+                                                                    error={saveButtonClicked && fontSizeError} // <-- Hiển thị viền đỏ nếu có lỗi
+                                                                    id="customFontSizeInput" // Thêm ID cho fieldID
+                                                                />
+                                                            </BlockStack>
+                                                            {saveButtonClicked && fontSizeError && (<InlineError message="Please enter a valid font size." fieldID="customFontSizeInput" />)}
+                                                            {/* </InlineStack> */}
+                                                        </InlineGrid>
+                                                    )
+                                                }
+                                            />
+                                        </BlockStack>
                                     </InlineGrid>
                                 </Card>
+                                {/* </Grid.Cell> */}
+
+                                {/* <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 6, xl: 6 }}> */}
+                                {/* Visibility */}
+                                <Card>
+                                    <div style={{ marginBottom: "10px" }}>
+                                        <Text variant="headingMd">Visibility</Text>
+                                    </div>
+                                    <InlineGrid gap={100}>
+                                        {/* Show on all pages */}
+                                        <BlockStack style={{ display: 'flex', flexDirection: 'column', marginLeft: '30px' }}>
+                                            <RadioButton
+                                                label="Show on all pages"
+                                                checked={inputs?.visibilityMode === "all"}
+                                                onChange={() => {
+                                                    handleInputChange("visibilityMode", "all");
+                                                }}
+                                            />
+
+                                            {/* Show on specific pages */}
+                                            <RadioButton
+                                                label="Show on specific pages"
+                                                checked={inputs?.visibilityMode === "specific"}
+                                                onChange={() => {
+                                                    handleInputChange("visibilityMode", "specific");
+                                                }}
+                                                helpText={
+                                                    inputs?.visibilityMode === "specific" && (
+                                                        <InlineGrid gap={200}>
+                                                            <InlineStack gap={200}>
+                                                                <BlockStack>
+                                                                    <Checkbox
+                                                                        label="Home page"
+                                                                        checked={checkedPages.homePage}
+                                                                        onChange={(newChecked) => handleChanger("homePage", newChecked)}
+                                                                    />
+                                                                    <Checkbox
+                                                                        label="Cart pages"
+                                                                        checked={checkedPages.cartPage}
+                                                                        onChange={(newChecked) => handleChanger("cartPage", newChecked)}
+                                                                    />
+                                                                    <Checkbox
+                                                                        label="Blog pages"
+                                                                        checked={checkedPages.blogPage}
+                                                                        onChange={(newChecked) => handleChanger("blogPage", newChecked)}
+                                                                    />
+                                                                    <Checkbox
+                                                                        label="Products pages"
+                                                                        checked={checkedPages.productsPage}
+                                                                        onChange={(newChecked) => handleChanger("productsPage", newChecked)}
+                                                                    />
+                                                                    <Checkbox
+                                                                        label="Collections pages"
+                                                                        checked={checkedPages.collectionsPage}
+                                                                        onChange={(newChecked) => handleChanger("collectionsPage", newChecked)}
+                                                                    />
+                                                                    <Checkbox
+                                                                        label="Custom URL handle"
+                                                                        checked={checkedPages.customUrl}
+                                                                        onChange={(newChecked) => handleChanger("customUrl", newChecked)}
+                                                                    />
+                                                                    {saveButtonClicked && checkboxError &&
+                                                                        inputs?.visibilityMode === "specific" &&
+                                                                        !checkedPages.homePage &&
+                                                                        !checkedPages.cartPage &&
+                                                                        !checkedPages.blogPage &&
+                                                                        !checkedPages.productsPage &&
+                                                                        !checkedPages.collectionsPage &&
+                                                                        !checkedPages.customUrl && (
+                                                                            <InlineError message="Please select at least one option" />
+                                                                        )}
+                                                                    {/* Hiển thị TextField khi checkbox "Custom URL" được chọn */}
+                                                                    {checkedPages.customUrl && (
+                                                                        <BlockStack  >
+                                                                            {/* Các ô nhập URL động */}
+                                                                            {textFields.map((field, index) => (
+                                                                                <BlockStack key={index} style={{ flexDirection: 'column', marginTop: '5px', marginLeft: '26px' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '5px' }}>
+                                                                                        <TextField
+                                                                                            value={field}
+                                                                                            onChange={(value) => handleTextFieldChange(index, value)}
+                                                                                            placeholder="your-url-handle"
+                                                                                            autoComplete="off"
+                                                                                            // required
+                                                                                            prefix="/" // Thêm thuộc tính prefix
+                                                                                            error={saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && customUrlsError !== "Please Add at least one URL." ? true : false}
+                                                                                        />
+                                                                                        {/* Thay thế div bằng Button */}
+                                                                                        <Button
+                                                                                            icon={DeleteIcon}
+                                                                                            tone="base"
+                                                                                            onClick={() => handleRemoveField(index)}
+                                                                                            size="small" // Thêm size small để button nhỏ hơn
+                                                                                            disabled={textFields.length <= 1}
+                                                                                        />
+                                                                                    </div>
+                                                                                    {/* {saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && customUrlsError !== "Please Add at least one URL." && <InlineError message={customUrlsError} fieldID={`customUrl-${index}`} />}  */}
+                                                                                    {saveButtonClicked && customUrlsError === "Please enter the URL." && !field.trim() && <InlineError message="Please enter a URL handle." fieldID={`customUrl-${index}`} />}
+                                                                                </BlockStack>
+                                                                            ))}
+
+                                                                            {/* Nút Thêm TextField */}
+                                                                            <div style={{ marginTop: '5px', marginBottom: '6px', marginLeft: '26px' }}>
+                                                                                <Button icon={PlusIcon} onClick={handleAddField} >
+                                                                                    Add URL
+                                                                                </Button>
+                                                                            </div>
+                                                                            {/* {saveButtonClicked && customUrlsError === "Please Add at least one URL." && textFields.length === 0 && <InlineError message={customUrlsError} />} */}
+                                                                            {saveButtonClicked && customUrlsError === "Please Add at least one URL." && textFields.length === 0 && <InlineError message="Please add at least one URL handle." />}
+                                                                        </BlockStack>
+                                                                    )}
+                                                                </BlockStack>
+                                                            </InlineStack>
+                                                        </InlineGrid>
+                                                    )
+                                                }
+                                            />
+                                        </BlockStack>
+                                    </InlineGrid>
+                                </Card>
+                                {/* </Grid.Cell> */}
+                                {/* </Grid> */}
+                                {/* Visibility */}
 
                                 <div title="Save">
                                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1553,7 +1895,6 @@ export default function FontManager() {
                                         )}
                                     </div>
                                 </div>
-
                             </BlockStack>
                         </Layout.Section>
                     </Layout>

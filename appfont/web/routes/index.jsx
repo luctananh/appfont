@@ -37,6 +37,7 @@ import {
     CheckIcon,
     MenuIcon,
     XIcon,
+    TextFontListIcon,
 } from '@shopify/polaris-icons';
 
 const FONT_PER_PAGE = 5;
@@ -538,7 +539,7 @@ export default function AppPage() {
                                 ) : (
 
                                     <Card >
-                                        <BlockStack style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' , margin: '0px 8px'}}>
+                                        <BlockStack style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0px 8px' }}>
                                             <Text variant="headingMd" as="h6"> Add fonts </Text>
                                             <Button secondary url="/about" variant="primary">Add new font</Button>
                                         </BlockStack>
@@ -547,14 +548,19 @@ export default function AppPage() {
                                             <ResourceList
                                                 items={sortedPaginatedFonts}
                                                 renderItem={(item) => {
-                                                    const { id, name, keyfont, updatedAt, checkbox,size } = item;
+                                                    const { id, name, keyfont, updatedAt, checkbox, size } = item;
                                                     // const isActive = currentAppliedFont === id || (!currentAppliedFont && new Date(updatedAt).getTime() === latestUpdatedAt);
                                                     const isActive = currentAppliedFont === id;
+                                                    const media = <Icon
+                                                        source={TextFontListIcon}
+                                                        tone="base"
+                                                    />;
                                                     return (
                                                         <ResourceList.Item
                                                             id={id}
                                                             accessibilityLabel={`View details for ${name}`}
                                                             persistActions  // Giữ lại thuộc tính này để luôn hiển thị hành động
+                                                            media={media}
                                                         >
 
                                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginRight: '20px' }}>

@@ -1,167 +1,265 @@
-{% assign design_settings = shop.metafields.setting.style %}
-{% comment %} {% assign design_settings = null %} {% endcomment %}
-{% if design_settings %}
-  {% assign font_settings = design_settings | parse_json %}
-  {% assign font_value = font_settings.value %}
-  <script>
-    window.fontSettings = {{ font_value | json }};
-    console.log("Font settings from liquid:", window.fontSettings);
-  </script>
-{% else %}
+{% comment %} --- Font Application Liquid --- {% endcomment %}
 
-{% endif %}
-<script src="https://appfont--development.gadget.app/api/client/web.min.js" defer="defer"></script>
 {% assign design_settings = shop.metafields.setting.style %}
-{% comment %} {% assign design_settings = null %} {% endcomment %}
+
 {% if design_settings %}
+  {% comment %} Parse the JSON settings from the metafield {% endcomment %}
   {% assign font_settings = design_settings | parse_json %}
   {% assign font_value = font_settings.value | parse_json %}
-  <script>
-    window.fontSettings = {{ font_value | json }};
-    console.log("Font settings from liquid:", window.fontSettings);
-    // Để xem giá trị fontSize trong JavaScript:
-    console.log("Custom font size:", window.fontSettings.fontSize);
-  </script>
-  {% comment %}
-    // Nếu bạn muốn truy cập fontSize trực tiếp trong Liquid (ít phổ biến hơn):
-    {% assign custom_font_size = font_value.fontSize %}
-    <script>
-      console.log("Custom font size from liquid (variable):", "{{ custom_font_size }}");
-    </script>
-  {% endcomment %}
-{% else %}
 
-{% endif %}
-<script src="https://appfont--development.gadget.app/api/client/web.min.js" defer="defer"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    // Hàm chèn CSS cho font từ URL blob
-    function injectFontCSSFromBlob(blobURL, fontName, fontType, selectors) {
-      const styleElement = document.createElement('style');
-      styleElement.type = 'text/css';
-      // Định dạng format cho từng loại font
-      let format = fontType === 'ttf' ? 'truetype' : fontType === 'woff' ? 'woff' : 'opentype';
-      let cssContent = `
+  {% comment %} --- Visibility Logic Calculation --- {% endcomment %}
+  {% assign should_apply_font = false %}
+  {% if font_value != blank %}
+    {% assign visibilityMode = font_value.visibilityMode | default: 'all' %}
+    {% assign current_page_url = request.path %}
+
+    {% case visibilityMode %}
+      {% when 'all' %}
+        {% assign should_apply_font = true %}
+        <script>
+          console.info('Font Visibility: Mode is "all", applying font.');
+        </script>
+
+      {% when 'specific' %}
+        <script>
+          console.info('Font Visibility: Mode is "specific", checking rules for path:', '{{ current_page_url }}');
+        </script>
+        {% comment %} Check each specific page condition {% endcomment %}
+        {% if font_value.homePage == true and current_page_url == '/' %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.cartPage == true and current_page_url == '/cart' %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.blogPage == true and current_page_url contains '/blogs/' %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.productsPage == true and current_page_url contains '/products/' %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.collectionsPage == true and current_page_url == '/collections' %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.collectionsPage == true
+          and current_page_url contains '/collections/'
+          and current_page_url != '/collections'
+        %}
+          {% comment %} Ensure it's a specific collection, not the main list page already matched {% endcomment %}
+          {% assign should_apply_font = true %}
+        {% elsif font_value.customUrl == true and font_value.customUrls != blank and font_value.customUrls != null %}
+          {% assign custom_urls_array = font_value.customUrls %}
+          {% if custom_urls_array.size > 0 %}
+            {% for url in custom_urls_array %}
+              {% comment %} Normalize the URL from settings {% endcomment %}
+              {% assign trimmed_url = url | strip %}
+              {% assign first_char = trimmed_url | slice: 0, 1 %}
+              {% if first_char != '/' %}
+                {% assign trimmed_url = '/' | append: trimmed_url %}
+              {% endif %}
+              {% assign last_char = trimmed_url | slice: -1, 1 %}
+              {% if last_char == '/' and trimmed_url != '/' %}
+                {% assign url_length = trimmed_url | size %}
+                {% assign new_length = url_length | minus: 1 %}
+                {% assign trimmed_url = trimmed_url | slice: 0, new_length %}
+              {% endif %}
+
+              {% comment %} Compare with current page URL {% endcomment %}
+              {% if current_page_url == trimmed_url %}
+                {% assign should_apply_font = true %}
+                {% break %}
+                {% comment %} Exit loop once matched {% endcomment %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endif %}
+
+        {% comment %} Log if no specific rule matched {% endcomment %}
+        {% unless should_apply_font %}
+          <script>
+            console.info('Font Visibility Check: Mode is "specific", but no rules matched.');
+          </script>
+        {% endunless %}
+
+      {% else %}
+        <script>
+          console.warn('Font Visibility: Unknown visibilityMode value:', '{{ visibilityMode }}');
+        </script>
+    {% endcase %}
+  {% else %}
+    <script>
+      console.warn('Font Visibility Check: font_value from metafield is blank.');
+    </script>
+  {% endif %}
+  {% comment %} --- End Visibility Logic Calculation --- {% endcomment %}
+
+  {% comment %} --- Conditional Font Application Block --- {% endcomment %}
+  {% if should_apply_font %}
+    {% comment %} 1. Make font settings available to JavaScript {% endcomment %}
+    <script>
+      window.fontSettings = {{ font_value | json }};
+      console.log("Applying Font Settings on this page:", window.fontSettings);
+    </script>
+
+    {% comment %} 2. Load the necessary client library {% endcomment %}
+    <script src="https://appfont--development.gadget.app/api/client/web.min.js" defer="defer"></script>
+
+    {% comment %} 3. Add the JavaScript logic to inject the font styles {% endcomment %}
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        // --- Helper Functions (Keep these inside DOMContentLoaded) ---
+        function injectFontCSSFromBlob(blobURL, fontName, fontType, selectors) {
+          const styleElement = document.createElement('style');
+          styleElement.type = 'text/css';
+          let format = fontType === 'ttf' ? 'truetype' : fontType === 'woff' ? 'woff' : 'opentype'; // Common formats
+          if (fontType === 'woff2') format = 'woff2'; // Add woff2 if needed
+
+          let cssContent = `
             @font-face {
-                font-family: "${fontName}";
-                src: url('${blobURL}') format('${format}');
+              font-family: "${fontName}";
+              src: url('${blobURL}') format('${format}');
+              font-display: swap; /* Optional: Improve perceived performance */
             }
-        `;
-      if (selectors) {
-        cssContent += `
-                ${selectors} {
-                    font-family: "${fontName}" !important;
-                    ${
-                      window.fontSettings.fontSize
-                        ? 'font-size: ' + window.fontSettings.fontSize + 'px !important;'
-                        : ''
-                    }
-                }
+          `;
+          if (selectors) {
+            const sizeRule =
+              window.fontSettings && window.fontSettings.fontSize && window.fontSettings.fontSize !== 'default'
+                ? `font-size: ${window.fontSettings.fontSize}px !important;`
+                : '';
+            cssContent += `
+              ${selectors} {
+                font-family: "${fontName}" !important;
+                ${sizeRule}
+              }
             `;
-      } else {
-        console.warn('No elements selected. Font will not be applied.');
-      }
-      styleElement.appendChild(document.createTextNode(cssContent));
-      document.head.appendChild(styleElement);
-      console.log('CSS injected for font:', fontName, 'with format:', format, 'and selectors:', selectors);
-    }
-    // Hàm chèn CSS cho Google Fonts link
-    function injectFontCSSFromGoogle(fontName, fontLink, selectors) {
-      const styleElement = document.createElement('style');
-      styleElement.type = 'text/css';
-      let cssContent = `
-            @import url("${fontLink}");
-        `;
-      if (selectors) {
-        cssContent += `
-                ${selectors} {
-                    font-family: "${fontName}" !important;
-                    ${
-                      window.fontSettings.fontSize
-                        ? 'font-size: ' + window.fontSettings.fontSize + 'px !important;'
-                        : ''
-                    }
-                }
-            `;
-      } else {
-        console.warn('No elements selected. Font will not be applied.');
-      }
-      styleElement.appendChild(document.createTextNode(cssContent));
-      document.head.appendChild(styleElement);
-      console.log('Google Font CSS injected for:', fontName, 'with link:', fontLink, 'and selectors:', selectors);
-    }
-    // Hàm xác định type của font từ base64
-    function getFontType(base64) {
-      if (base64.startsWith('d09GR')) {
-        return 'woff'; // WOFF
-      } else if (base64.startsWith('AAEAAAA')) {
-        return 'ttf'; // TTF
-      } else if (base64.startsWith('T1RUTw')) {
-        return 'otf'; // OTF
-      }
-      return null;
-    }
-    // Hàm chuyển đổi base64 thành blob
-    function base64toBlob(base64, type) {
-      try {
-        const bytes = atob(base64);
-        const byteNumbers = new Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) {
-          byteNumbers[i] = bytes.charCodeAt(i);
+          } else {
+            console.warn('No elements selected for font application.');
+          }
+          styleElement.appendChild(document.createTextNode(cssContent));
+          document.head.appendChild(styleElement);
+          console.log('CSS injected for Uploaded/Blob font:', fontName);
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: type });
-      } catch (error) {
-        console.error('Error converting base64 to blob:', error);
-        return null;
-      }
-    }
-    // Kiểm tra nếu `fontSettings` tồn tại và có link
-    if (window.fontSettings && window.fontSettings.link) {
-      const fontName = window.fontSettings.name || 'CustomFont';
-      const fontLink = window.fontSettings.link;
-      const selectedElements = window.fontSettings.selectedElements;
-      let selectors = selectedElements ? selectedElements.split(',').join(', ') : null;
-      // Nếu link là base64
-      if (fontLink.startsWith('d09GR') || fontLink.startsWith('AAEAAAA') || fontLink.startsWith('T1RUTw')) {
-        const fontType = getFontType(fontLink);
-        if (fontType) {
+
+        function injectFontCSSFromGoogle(fontName, fontLink, selectors) {
+          const styleElement = document.createElement('style');
+          styleElement.type = 'text/css';
+          // Ensure the Google Font URL includes font-display: swap
+          const fontLinkWithSwap = fontLink.includes('display=swap') ? fontLink : `${fontLink}&display=swap`;
+
+          let cssContent = `
+            @import url("${fontLinkWithSwap}");
+          `;
+          if (selectors) {
+            const sizeRule =
+              window.fontSettings && window.fontSettings.fontSize && window.fontSettings.fontSize !== 'default'
+                ? `font-size: ${window.fontSettings.fontSize}px !important;`
+                : '';
+            cssContent += `
+              ${selectors} {
+                font-family: "${fontName}" !important;
+                 ${sizeRule}
+              }
+            `;
+          } else {
+            console.warn('No elements selected for font application.');
+          }
+          styleElement.appendChild(document.createTextNode(cssContent));
+          document.head.appendChild(styleElement);
+          console.log('CSS injected for Google font:', fontName);
+        }
+
+        function getFontType(base64) {
+          // Basic checks, might need refinement for edge cases
+          if (base64.startsWith('d09GR')) return 'woff';
+          if (base64.startsWith('AAEAAA')) return 'ttf';
+          if (base64.startsWith('T1RUTw')) return 'otf';
+          if (base64.startsWith('d09GM')) return 'woff2'; // Basic check for WOFF2
+          console.warn('Could not reliably determine font type from base64 prefix.');
+          return 'woff2'; // Default guess
+        }
+
+        function base64toBlob(base64, type) {
           try {
-            const blob = base64toBlob(fontLink, `font/${fontType}`);
-            if (blob) {
-              const blobURL = URL.createObjectURL(blob);
-              injectFontCSSFromBlob(blobURL, fontName, fontType, selectors);
-            } else {
-              console.error('Blob creation failed for:', fontName);
+            const bytes = atob(base64);
+            const byteNumbers = new Array(bytes.length);
+            for (let i = 0; i < bytes.length; i++) {
+              byteNumbers[i] = bytes.charCodeAt(i);
             }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: type });
           } catch (error) {
-            console.error('Error processing base64 font:', error);
+            console.error('Error converting base64 to blob:', error);
+            return null;
+          }
+        }
+        // --- End Helper Functions ---
+
+        // --- Main Font Application Logic ---
+        if (window.fontSettings && window.fontSettings.link) {
+          const fontName = window.fontSettings.name || 'CustomFont'; // Use name from settings
+          const fontLink = window.fontSettings.link;
+          const selectedElements = window.fontSettings.selectedElements;
+          // Ensure selectors are valid CSS selectors
+          let selectors = selectedElements
+            ? selectedElements
+                .split(',')
+                .map((s) => s.trim())
+                .filter((s) => s)
+                .join(', ')
+            : null;
+
+          if (!selectors) {
+            console.warn('No valid CSS selectors found in selectedElements. Font will not be applied.');
+            return; // Exit if no elements to apply to
+          }
+
+          // Check link type and inject accordingly
+          if (fontLink.startsWith('https://fonts.googleapis.com')) {
+            injectFontCSSFromGoogle(fontName, fontLink, selectors);
+          } else if (fontLink.startsWith('blob:')) {
+            // Attempt to get type from name extension if available
+            let fileType = fontName.split('.').pop().toLowerCase();
+            if (!['otf', 'ttf', 'woff', 'woff2'].includes(fileType)) {
+              console.warn(`Could not determine font type from name extension "${fileType}", defaulting to woff2.`);
+              fileType = 'woff2'; // Default guess
+            }
+            injectFontCSSFromBlob(fontLink, fontName.replace(/\.[^/.]+$/, ''), fileType, selectors); // Remove extension from font-family name
+          } else if (/^[A-Za-z0-9+/=]+$/.test(fontLink) && fontLink.length % 4 === 0) {
+            // Basic Base64 check (might catch non-font data)
+            const fontType = getFontType(fontLink);
+            if (fontType) {
+              const blob = base64toBlob(fontLink, `font/${fontType}`);
+              if (blob) {
+                const blobURL = URL.createObjectURL(blob);
+                injectFontCSSFromBlob(blobURL, fontName.replace(/\.[^/.]+$/, ''), fontType, selectors); // Remove extension from font-family name
+                // Consider revoking the blob URL later if memory becomes an issue: URL.revokeObjectURL(blobURL);
+              } else {
+                console.error('Blob creation failed for base64 font:', fontName);
+              }
+            } else {
+              console.error('Could not determine font type for base64 data.');
+            }
+          } else {
+            // Fallback for other potential valid URLs (less common for fonts)
+            // Consider if this case is actually needed or if it should be an error
+            console.warn(
+              'Font link is not a recognized Google Font, Blob URL, or Base64. Attempting import like Google Font:',
+              fontLink
+            );
+            injectFontCSSFromGoogle(fontName, fontLink, selectors);
           }
         } else {
-          console.error('Unsupported base64 font format');
+          // This should ideally not happen if should_apply_font is true
+          console.error('Font application logic reached, but window.fontSettings or link is missing.');
         }
-      }
-      // Nếu link là Google Fonts
-      else if (fontLink.startsWith('https://fonts.googleapis.com')) {
-        injectFontCSSFromGoogle(fontName, fontLink, selectors);
-      }
-      // Nếu link là blob URL
-      else if (fontLink.startsWith('blob:')) {
-        let fileType = fontName.split('.').pop().toLowerCase();
-        if (fileType === 'otf' || fileType === 'ttf' || fileType === 'woff') {
-          injectFontCSSFromBlob(fontLink, fontName, fileType, selectors);
-        } else {
-          console.error('Error: cannot identify the type of font');
-        }
-      }
-      // Nếu link là URL thông thường
-      else if (fontLink) {
-        injectFontCSSFromGoogle(fontName, fontLink, selectors);
-      } else {
-        console.error('Font link is missing or invalid.');
-      }
-    } else {
-      console.error('Font settings not found or invalid.');
-    }
-  });
-</script>
+        // --- End Main Font Application Logic ---
+      }); // End DOMContentLoaded listener
+    </script>
+
+  {% else %}
+    {% comment %} Font should not be applied on this page {% endcomment %}
+    <script>
+      console.info('Font not applied on this page due to visibility settings. Current path:', '{{ request.path }}');
+    </script>
+  {% endif %}
+  {% comment %} --- End Conditional Font Application Block --- {% endcomment %}
+
+{% else %}
+  <script>
+    console.info("No font design settings found in metafield 'shop.metafields.setting.style'.");
+  </script>
+{% endif %}
