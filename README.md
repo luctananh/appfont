@@ -23,3 +23,27 @@
 
 ```bash
 npm install
+```
+### Phát triển
+```bash
+npm run dev
+```
+### Build production
+```bash
+npm run build
+```
+### Cấu trúc dự án
+- appfont/: Source code chính của package appfont
+- node_modules/: Thư viện phụ thuộc
+- package.json: Thông tin và cấu hình package
+- package-lock.json: Quản lý versions phụ thuộc
+### Scripts
+- build: Build production sử dụng Vite
+### Phụ thuộc chính
+- @gadgetinc/react
+- @gadgetinc/react-shopify-app-bridge
+- @shopify/app-bridge-react
+- @shopify/polaris
+- @shopify/polaris-icons
+- shopify-api-node
+- react, react-dom, react-router
