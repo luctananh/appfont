@@ -22,4 +22,4 @@
 ### Cài đặt
 
 ```bash
-npm install# appfont
+npm install
