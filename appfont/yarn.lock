@@ -168,10 +168,10 @@
   version "0.0.0"
   uid ""
 
-"@gadgetinc/api-client-core@0.15.38":
-  version "0.15.38"
-  resolved "https://registry.yarnpkg.com/@gadgetinc/api-client-core/-/api-client-core-0.15.38.tgz#8427e3d74e7278f4d5346dce9517659fdbaa76eb"
-  integrity sha512-rLyOGxzly1LtT724NNpdKukFi4We6jjio/k3LXGINehjPEpSzcgSchjO3icp++GlhAyZCiFBt/cEBUKnLp3mXA==
+"@gadgetinc/api-client-core@0.15.46":
+  version "0.15.46"
+  resolved "https://registry.yarnpkg.com/@gadgetinc/api-client-core/-/api-client-core-0.15.46.tgz#08123dd62faaa95a60f9aa42bbc3e518ecc178be"
+  integrity sha512-NKc/1PKo6KzVnPaTnuQCVxbg6Q7Vvkr0Q4au4i/vr/aZQ8RQagcxqlDq6XElO8xM/UfIN0qXMK63ImeBdmo9Gw==
   dependencies:
     "@0no-co/graphql.web" "^1.0.4"
     "@n1ru4l/graphql-live-query" "^0.10.0"
@@ -187,7 +187,7 @@
     tslib "^2.6.2"
     type-fest "^3.13.1"
     wonka "^6.3.2"
-    ws "^8.17.0"
+    ws "^8.18.2"
 
 "@gadgetinc/api-client-core@^0.15.35", "@gadgetinc/api-client-core@^0.15.36":
   version "0.15.37"
@@ -1551,6 +1551,11 @@ ws@^8.17.0:
   version "8.18.0"
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.0.tgz#0d7505a6eafe2b0e712d232b42279f53bc289bbc"
   integrity sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==
+
+ws@^8.18.2:
+  version "8.18.3"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
+  integrity sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==
 
 yup@^1.2.0:
   version "1.6.1"

@@ -64,6 +64,7 @@ export default function AppPage() {
     const [applyingFontId, setApplyingFontId] = useState(null);
     const [currentAppliedFont, setCurrentAppliedFont] = useState(null);
     const [showMediaCard, setShowMediaCard] = useState(true);
+    const [shopDomain, setShopDomain] = useState('');
     const navigate = useNavigate(); // Initialize useNavigate
     // --- TÍNH TOÁN SỐ LƯỢNG FONT ---
     const googleFontsCount = fontData.filter(font => font.keyfont === 'google').length;
@@ -97,7 +98,9 @@ export default function AppPage() {
             setLoading(true);
             try {
                 // --- THÊM: Lấy Shop ID (cần thiết để truy vấn selectfont) ---
-                const shop = await api.shopifyShop.findFirst({ select: { id: true } });
+                // const shop = await api.shopifyShop.findFirst({ select: { id: true } });
+                const shop = await api.shopifyShop.findFirst({ select: { id: true, myshopifyDomain: true } });
+                
                 const shopid = shop?.id ? String(shop.id) : null;
                 // --- KẾT THÚC THÊM ---
 
@@ -108,7 +111,7 @@ export default function AppPage() {
                     value: theme.id,
                 }));
                 setThemes(themeOptions);
-
+                setShopDomain(shop?.myshopifyDomain || '');
                 // Fetch all fonts (như cũ)
                 const fontResult = await api.datafontgg.findMany();
                 setFontData(fontResult);
@@ -206,7 +209,8 @@ export default function AppPage() {
 
     const handleApplyNow = () => {
         if (selectedThemeId) {
-            const editorUrl = `https://admin.shopify.com/store/storelta/themes/${selectedThemeId}/editor?context=apps`;
+            // const editorUrl = `https://admin.shopify.com/store/altshopa/themes/${selectedThemeId}/editor?context=apps`;
+            const editorUrl = `https://admin.shopify.com/store/${shopDomain.replace('.myshopify.com', '')}/themes/${selectedThemeId}/editor?context=apps`;
             window.open(editorUrl, "_blank");
         } else {
             setBannerContent('Please select a theme first.');
@@ -296,8 +300,8 @@ export default function AppPage() {
             // Chỉ cập nhật thông qua selectfont
             if (!font.checkbox) throw new Error('Font has no assigned elements');
 
-            const shop = await api.shopifyShop.findFirst({ select: { id: true } });
-
+            // const shop = await api.shopifyShop.findFirst({ select: { id: true } });
+            const shop = await api.shopifyShop.findFirst({ select: { id: true, myshopifyDomain: true } });
             if (!shop?.id) throw new Error('Could not fetch Shop ID');
 
             const shopid = String(shop.id);

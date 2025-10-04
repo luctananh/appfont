@@ -1,82 +1,63 @@
-import { applyParams, ActionOptions } from "gadget-server";
+import { ActionOptions } from "gadget-server";
+
 /** @type { ActionRun } */
 export const run = async ({ params, logger, api, connections, sessionID }) => {
-  
-  const selecteddesign = await api.selectfont.findFirst();
-  
-  console.log("Selected design:", selecteddesign);
-  const sessionIF = await api.session.findById(sessionID);
-  const shopId = sessionIF.shopId;
-  const shop = await api.shopifyShop.findOne(shopId);
-  const domain = shop.domain;
-  const shopifyClient = await connections.shopify.forShopDomain(domain);
-  const accessToken = shopifyClient.storefrontAccessToken.shopify.options.accessToken;
-  const API_VERSION = '2024-10';
-
-  // Đảm bảo namespace đã được định nghĩa
-  const namespace = "setting";  // Gán giá trị cho namespace
-  const key = "style";  // Gán giá trị cho key
-  
-  if (!accessToken || !domain) {
-    throw new Error("Missing required parameters: accessToken, domain");
-  }
-
   try {
-    // Lấy danh sách Metafields
-    const metafieldsResponse = await fetch(`https://${domain}/admin/api/${API_VERSION}/metafields.json`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-      },
+    const sessionIF = await api.session.findById(sessionID);
+    const shopId = sessionIF.shopId;
+    
+    // Lấy font setting của shop hiện tại
+    const selecteddesign = await api.selectfont.findFirst({
+      filter: {
+        shopid: { equals: String(shopId) },
+        namespace: { equals: "setting" },
+        key: { equals: "style" }
+      }
     });
-
-    if (!metafieldsResponse.ok) {
-      const errorText = await metafieldsResponse.text();
-      throw new Error(`Failed to fetch metafields: ${metafieldsResponse.status} - ${errorText}`);
+    
+    if (!selecteddesign?.value) {
+      logger.info("No font selected for this shop");
+      return;
     }
     
-    const metafieldsData = await metafieldsResponse.json();
-    const metafields = metafieldsData.metafields;
-    console.log("Existing Metafields:", metafields);
-
-    // Tìm kiếm metafield đã tồn tại (nếu có)
-    const existingMetafield = metafields.find(mf => mf.namespace === namespace && mf.key === key);
-
-    const metafieldUrl = existingMetafield
-      ? `https://${domain}/admin/api/${API_VERSION}/metafields/${existingMetafield.id}.json`
-      : `https://${domain}/admin/api/${API_VERSION}/metafields.json`;
-
-    const metafieldData = {
-      namespace: namespace,  // Sử dụng namespace đã định nghĩa
-      key: key,              // Sử dụng key đã định nghĩa
-      value: JSON.stringify(selecteddesign),
-      type: "json_string",
-    };
-
-    console.log(`Processing Metafield (${namespace}:${key}):`, metafieldData);
-    const response = await fetch(metafieldUrl, {
-      method: existingMetafield ? "PUT" : "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": accessToken,
-      },
-      body: JSON.stringify({ metafield: metafieldData }),
+    // Dùng Shopify client trực tiếp
+    const shopifyClient = await connections.shopify.forShopId(shopId);
+    
+    const result = await shopifyClient.graphql(`
+      mutation ($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+          metafields {
+            key
+            namespace
+            value
+          }
+          userErrors {
+            message
+          }
+        }
+      }
+    `, {
+      metafields: [{
+        key: "style",
+        namespace: "setting", 
+        ownerId: `gid://shopify/Shop/${shopId}`,
+        type: "json",
+        value: JSON.stringify(selecteddesign.value)
+      }]
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to process metafield (${namespace}:${key}): ${response.status} - ${errorText}`);
+    
+    if (result.metafieldsSet.userErrors.length > 0) {
+      throw new Error("Shopify errors: " + JSON.stringify(result.metafieldsSet.userErrors));
     }
-
-    const updatedMetafield = await response.json();
-    console.log(`Updated Metafield (${namespace}:${key}):`, updatedMetafield);
-
+    
+    logger.info("Metafield updated successfully", result.metafieldsSet.metafields);
+    
   } catch (error) {
-    logger.error("Error processing design settings metafield:", error.message);
+    logger.error("Error updating metafield:", error);
     throw error;
   }
 };
+
 /** @type { ActionOptions } */
 export const options = {
   actionType: "custom",

@@ -6,7 +6,38 @@ import type { GadgetModel } from "gadget-server";
 export const schema: GadgetModel = {
   type: "gadget/model-schema/v1",
   storageKey: "DataModel-Shopify-Shop",
-  fields: {},
+  fields: {
+    cookieConsentLevel: {
+      type: "string",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-cookie_consent_level::FieldStorageEpoch-DataModel-Shopify-Shop-cookie_consent_level-initial",
+    },
+    currency: {
+      type: "string",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-currency::FieldStorageEpoch-DataModel-Shopify-Shop-currency-initial",
+    },
+    eligibleForCardReaderGiveaway: {
+      type: "boolean",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-eligible_for_card_reader_giveaway::FieldStorageEpoch-DataModel-Shopify-Shop-eligible_for_card_reader_giveaway-initial",
+    },
+    enabledPresentmentCurrencies: {
+      type: "json",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-enabled_presentment_currencies::FieldStorageEpoch-DataModel-Shopify-Shop-enabled_presentment_currencies-initial",
+    },
+    forceSsl: {
+      type: "boolean",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-force_ssl::FieldStorageEpoch-DataModel-Shopify-Shop-force_ssl-initial",
+    },
+    weightUnit: {
+      type: "string",
+      storageKey:
+        "ModelField-DataModel-Shopify-Shop-weight_unit::FieldStorageEpoch-DataModel-Shopify-Shop-weight_unit-initial",
+    },
+  },
   shopify: {
     fields: [
       "address1",
@@ -14,22 +45,18 @@ export const schema: GadgetModel = {
       "assets",
       "checkoutApiSupported",
       "city",
-      "cookieConsentLevel",
       "country",
       "countryCode",
       "countryName",
       "countyTaxes",
-      "currency",
       "customerAccountsV2",
       "customerEmail",
       "domain",
-      "eligibleForCardReaderGiveaway",
+      "domains",
       "eligibleForPayments",
       "email",
-      "enabledPresentmentCurrencies",
       "files",
       "finances",
-      "forceSsl",
       "gdprRequests",
       "googleAppsDomain",
       "googleAppsLoginEnabled",
@@ -68,7 +95,6 @@ export const schema: GadgetModel = {
       "themes",
       "timezone",
       "transactionalSmsDisabled",
-      "weightUnit",
       "zipCode",
     ],
   },

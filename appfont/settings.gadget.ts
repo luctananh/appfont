@@ -6,15 +6,19 @@ export const settings: GadgetSettings = {
   plugins: {
     connections: {
       shopify: {
-        apiVersion: "2024-10",
+        apiVersion: "2025-07",
         enabledModels: [
           "shopifyAsset",
           "shopifyFile",
-          "shopifyProduct",
           "shopifyTheme",
         ],
         type: "partner",
-        scopes: ["read_products", "read_themes"],
+        scopes: [
+          "read_products",
+          "write_products",
+          "write_themes",
+          "read_themes",
+        ],
       },
     },
   },

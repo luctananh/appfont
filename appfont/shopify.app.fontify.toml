@@ -1,0 +1,16 @@
+# Learn more about working with Shopify TOML files with Gadget at https://docs.gadget.dev/guides/plugins/shopify/advanced-topics/shopify-app-toml
+
+client_id = "1ed940a74b66bec5d6cfb8bbbe7d9a37"
+name = "fontify"
+application_url = "https://appfont--fontify.gadget.app/api/shopify/install-or-render"
+embedded = true
+
+[auth]
+redirect_urls = ["https://appfont--fontify.gadget.app/api/connections/auth/shopify/callback"]
+
+[webhooks]
+api_version = "2025-07"
+
+[[webhooks.subscriptions]]
+compliance_topics = [ "customers/data_request", "customers/redact" ,"shop/redact"]
+uri = "https://appfont--fontify.gadget.app/api/webhooks/shopify"

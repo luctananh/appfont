@@ -17,7 +17,7 @@ import {
   useNavigate,
 } from "react-router";
 import { api } from "../api";
-import AboutPage from "../routes/about";
+import FontManager from "../routes/about";
 import Index from "../routes/index";
 // Thêm import cho AddFontPage
 // import AddFontPage from "../routes/AddFontPage";
@@ -43,9 +43,7 @@ function App() {
     createRoutesFromElements(
       <Route path="/" element={<Layout />}>
         <Route index element={<Index />} />
-        <Route path="/about" element={<AboutPage />} />
-        // Thêm route cho AddFontPage
-        {/* <Route path="/addfont" element={<AddFontPage />} /> */}
+        <Route path="/about" element={<FontManager />} />
         <Route path="*" element={<Error404 />} />
       </Route>
     )
