@@ -71,7 +71,7 @@ Appfont là một ứng dụng Shopify mạnh mẽ cho phép chủ cửa hàng d
     ```
 
 4.  **Chạy máy chủ phát triển Gadget**:
-    Từ thư mục gốc của dự án (`D:\Code\appfont-1`), chạy lệnh sau để khởi động máy chủ phát triển Gadget và đồng bộ hóa các tệp của bạn:
+    Từ thư mục gốc của dự án (`D:\Code\appfont`), chạy lệnh sau để khởi động máy chủ phát triển Gadget và đồng bộ hóa các tệp của bạn:
     ```powershell
     ggt dev ./appfont --app=appfont --env=development --allow-unknown-directory
     ```
