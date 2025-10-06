@@ -60,7 +60,7 @@ Appfont là một ứng dụng Shopify mạnh mẽ cho phép chủ cửa hàng d
     Điều hướng đến thư mục gốc của dự án (nơi có `package.json` chính):
 
     ```powershell
-    cd D:\Code\appfont-1\appfont
+    cd D:\Code\appfont\appfont
     npm install
     ```
 
