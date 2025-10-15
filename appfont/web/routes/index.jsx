@@ -100,7 +100,7 @@ export default function AppPage() {
                 // --- THÊM: Lấy Shop ID (cần thiết để truy vấn selectfont) ---
                 // const shop = await api.shopifyShop.findFirst({ select: { id: true } });
                 const shop = await api.shopifyShop.findFirst({ select: { id: true, myshopifyDomain: true } });
-                
+
                 const shopid = shop?.id ? String(shop.id) : null;
                 // --- KẾT THÚC THÊM ---
 
@@ -508,7 +508,7 @@ export default function AppPage() {
                                         options={themes}
                                         onChange={handleThemeChange}
                                         value={selectedThemeId}
-                                        placeholder="Select a theme"
+                                        placeholder={selectedThemeId ? themes.find(theme => theme.value === selectedThemeId)?.label : "Select a theme"}
                                     />
                                     <Text as="p" variant="bodyMd">
                                         Click on Apply now button to go to the theme editor, after that

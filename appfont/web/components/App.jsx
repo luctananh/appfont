@@ -97,7 +97,9 @@ function EmbeddedApp() {
         <Link to="/" rel="home">
           home
         </Link>
-        <Link to="/about">Fonts</Link>
+        <Link to="/about">
+          Fonts
+        </Link>
         {/* Thêm link đến AddFontPage */}
         {/* <Link to="/addfont">Add Font</Link> */}
       </NavMenu>
